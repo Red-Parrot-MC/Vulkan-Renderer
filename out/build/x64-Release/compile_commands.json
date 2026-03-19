@@ -1,0 +1,14 @@
+[
+{
+  "directory": "C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release",
+  "command": "C:\\PROGRA~1\\MICROS~3\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1438~1.331\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG /Zi /Oi /GL /W3 /sdl /MD /Gy -MD /Fo_deps\\tinygltf-build\\CMakeFiles\\loader_example.dir\\loader_example.cc.obj /Fd_deps\\tinygltf-build\\CMakeFiles\\loader_example.dir\\ /FS -c C:\\Users\\teund\\Documents\\GitHub\\gp2-vulkan-renderer-Teun-DeMoor\\out\\build\\x64-Release\\_deps\\tinygltf-src\\loader_example.cc",
+  "file": "C:\\Users\\teund\\Documents\\GitHub\\gp2-vulkan-renderer-Teun-DeMoor\\out\\build\\x64-Release\\_deps\\tinygltf-src\\loader_example.cc",
+  "output": "_deps\\tinygltf-build\\CMakeFiles\\loader_example.dir\\loader_example.cc.obj"
+},
+{
+  "directory": "C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release",
+  "command": "C:\\PROGRA~1\\MICROS~3\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1438~1.331\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG /Zi /Oi /GL /W3 /sdl /MD /Gy -MD /Fo_deps\\tinygltf-build\\CMakeFiles\\tinygltf.dir\\tiny_gltf.cc.obj /Fd_deps\\tinygltf-build\\CMakeFiles\\tinygltf.dir\\tinygltf.pdb /FS -c C:\\Users\\teund\\Documents\\GitHub\\gp2-vulkan-renderer-Teun-DeMoor\\out\\build\\x64-Release\\_deps\\tinygltf-src\\tiny_gltf.cc",
+  "file": "C:\\Users\\teund\\Documents\\GitHub\\gp2-vulkan-renderer-Teun-DeMoor\\out\\build\\x64-Release\\_deps\\tinygltf-src\\tiny_gltf.cc",
+  "output": "_deps\\tinygltf-build\\CMakeFiles\\tinygltf.dir\\tiny_gltf.cc.obj"
+}
+]

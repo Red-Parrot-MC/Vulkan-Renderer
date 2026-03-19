@@ -1,0 +1,27 @@
+# ninja log v6
+26	878	7956593906340142	project/CMakeFiles/GP2_Vulkan_Renderer.dir/src/main.cpp.obj	b1a6e9c90ea18d7
+68	368	7950978767250248	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_time.c.obj	db6a6be158576108
+879	1642	7956593914870296	project/GP2_Vulkan_Renderer.exe	c1229677f81ccd5
+14	414	7950978766756871	_deps/glfw-build/src/CMakeFiles/glfw.dir/context.c.obj	d81fbda83ac76214
+45	372	7950978767073895	_deps/glfw-build/src/CMakeFiles/glfw.dir/osmesa_context.c.obj	efd68a1c063b3a2a
+56	396	7950978767212753	_deps/glfw-build/src/CMakeFiles/glfw.dir/null_window.c.obj	e89dbcdd93de953c
+52	360	7950978767073895	_deps/glfw-build/src/CMakeFiles/glfw.dir/null_monitor.c.obj	c8674f153de6973d
+64	380	7950978767250248	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_module.c.obj	c17c216fad79875
+60	365	7950978767250248	_deps/glfw-build/src/CMakeFiles/glfw.dir/null_joystick.c.obj	957d4b9442e2b487
+31	376	7950978766917284	_deps/glfw-build/src/CMakeFiles/glfw.dir/platform.c.obj	97b92a6b2d7c611e
+71	384	7950978767250248	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_thread.c.obj	cd42abf58f5d9aa5
+26	388	7950978766877219	_deps/glfw-build/src/CMakeFiles/glfw.dir/monitor.c.obj	2c6356f80d45a14
+38	393	7950978766917284	_deps/glfw-build/src/CMakeFiles/glfw.dir/window.c.obj	ff3692fcb2afffc4
+76	400	7950978767401022	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_init.c.obj	84080af823638d44
+44	742	7956576993366158	_deps/glm-build/glm/CMakeFiles/glm.dir/detail/glm.cpp.obj	1ca15fd0053428fb
+34	403	7950978766917284	_deps/glfw-build/src/CMakeFiles/glfw.dir/vulkan.c.obj	278a26a5d6400068
+49	406	7950978767073895	_deps/glfw-build/src/CMakeFiles/glfw.dir/null_init.c.obj	9b85b45b805e8270
+42	408	7950978766917284	_deps/glfw-build/src/CMakeFiles/glfw.dir/egl_context.c.obj	fe8d65ddc0d7fce1
+19	410	7950978766818371	_deps/glfw-build/src/CMakeFiles/glfw.dir/init.c.obj	ed85f111c42e80e1
+91	412	7950978767548475	_deps/glfw-build/src/CMakeFiles/glfw.dir/wgl_context.c.obj	61566ba3d134873f
+79	416	7950978767423856	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_joystick.c.obj	ea7065abf9ba383b
+23	422	7950978766877219	_deps/glfw-build/src/CMakeFiles/glfw.dir/input.c.obj	24ba161da3649b9f
+87	454	7950978767459951	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_window.c.obj	785075354e572866
+83	463	7950978767459951	_deps/glfw-build/src/CMakeFiles/glfw.dir/win32_monitor.c.obj	d64ea84c245a755b
+463	510	7950978771256291	_deps/glfw-build/src/glfw3.lib	7556ca4a2843141a
+744	801	7956577000367444	_deps/glm-build/glm/glm.lib	4d594a18dc682d82

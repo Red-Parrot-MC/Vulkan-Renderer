@@ -1,0 +1,121 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install",
+			"INSTALL"
+		],
+		"files" : 
+		[
+			"out/build/x64-Debug/_deps/tinygltf-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 93,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 94,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 96,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 99,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 108,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "lib",
+			"paths" : 
+			[
+				"_deps/tinygltf-build/tinygltf.lib"
+			],
+			"targetId" : "tinygltf::@cf7fec98cfc62fa92173",
+			"targetIndex" : 4,
+			"type" : "target"
+		},
+		{
+			"backtrace" : 2,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/tinygltf",
+			"exportName" : "tinygltfTargets",
+			"exportTargets" : 
+			[
+				{
+					"id" : "tinygltf::@cf7fec98cfc62fa92173",
+					"index" : 4
+				}
+			],
+			"paths" : 
+			[
+				"_deps/tinygltf-build/CMakeFiles/Export/117bf708282d84acb11f1c87a19c9d37/TinyGLTFTargets.cmake"
+			],
+			"type" : "export"
+		},
+		{
+			"backtrace" : 3,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/tinygltf",
+			"paths" : 
+			[
+				"out/build/x64-Debug/_deps/tinygltf-build/TinyGLTFConfig.cmake"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 4,
+			"component" : "Unspecified",
+			"destination" : "include",
+			"paths" : 
+			[
+				"out/build/x64-Debug/_deps/tinygltf-src/tiny_gltf.h",
+				"out/build/x64-Debug/_deps/tinygltf-src/tinygltf_json.h"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 5,
+			"component" : "Unspecified",
+			"destination" : "include",
+			"paths" : 
+			[
+				"out/build/x64-Debug/_deps/tinygltf-src/json.hpp",
+				"out/build/x64-Debug/_deps/tinygltf-src/stb_image.h",
+				"out/build/x64-Debug/_deps/tinygltf-src/stb_image_write.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "_deps/tinygltf-build",
+		"source" : "out/build/x64-Debug/_deps/tinygltf-src"
+	}
+}

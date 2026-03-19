@@ -1,0 +1,21 @@
+# ninja log v6
+3	55	7956608892868339	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-mkdir	780f96e19d2c2c5c
+3	55	7956608892868339	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-mkdir	780f96e19d2c2c5c
+56	1964	7956608911952011	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-download	49997f921967444e
+56	1964	7956608911952011	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-download	49997f921967444e
+1964	3896	7956608912003917	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-update	e64295eaebfa3b22
+1964	3896	7956608912003917	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-update	e64295eaebfa3b22
+3896	3941	7956608931733503	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-patch	4d39d4cc014af3fc
+3896	3941	7956608931733503	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-patch	4d39d4cc014af3fc
+3942	3987	7956608932178408	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-configure	be0fc9bb407dc97f
+3942	3987	7956608932178408	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-configure	be0fc9bb407dc97f
+3987	4042	7956608932739243	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-build	f189475b3c0f1644
+3987	4042	7956608932739243	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-build	f189475b3c0f1644
+4042	4088	7956608933186749	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-install	adea117079874127
+4042	4088	7956608933186749	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-install	adea117079874127
+4088	4143	7956608933745489	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-test	b652c89743076fc8
+4088	4143	7956608933745489	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-test	b652c89743076fc8
+4143	4206	7956608934371513	CMakeFiles/tinyobjloader-populate-complete	62394695a3b2711a
+4143	4206	7956608934371513	tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-done	62394695a3b2711a
+4143	4206	7956608934371513	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/CMakeFiles/tinyobjloader-populate-complete	62394695a3b2711a
+4143	4206	7956608934371513	C:/Users/teund/Documents/GitHub/gp2-vulkan-renderer-Teun-DeMoor/out/build/x64-Release/_deps/tinyobjloader-subbuild/tinyobjloader-populate-prefix/src/tinyobjloader-populate-stamp/tinyobjloader-populate-done	62394695a3b2711a
