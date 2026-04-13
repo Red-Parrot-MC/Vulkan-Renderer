@@ -1,10 +1,11 @@
 # Source files
 set(SOURCES 
 	"src/main.cpp"
+	"src/Application.h"
 )
 
 # Create the executable
-add_executable(${PROJECT_NAME} ${SOURCES} "src/Application.h" "src/Texture.h" "src/Texture.cpp" "src/BufferHelpers.h" "src/VulkanContext.h")
+add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Copy resources to output folder
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
