@@ -2,6 +2,17 @@
 set(SOURCES 
 	"src/main.cpp"
 	"src/Application.h"
+    "src/VulkanContext.h"
+    "src/BufferHelpers.h"
+    "src/ImageHelpers.h"
+    "src/Texture.cpp"
+    "src/VulkanContext.cpp"
+    "src/VulkanSetup.h"
+    "src/VulkanSetup.cpp"
+    "src/structs.h"
+    "src/Application2.h" 
+    "src/Scene.h" 
+    "src/Scene.cpp"
 )
 
 # Create the executable

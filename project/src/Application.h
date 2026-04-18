@@ -287,29 +287,29 @@ private:
     }
 
     void initVulkan() {
-        createInstance();
-        setupDebugMessenger();
-        createSurface();
-        pickPhysicalDevice();
-        createLogicalDevice();
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createDescriptorSetLayout();
-        createGraphicsPipeline();
-        createCommandPool();
-        createDepthResources();
-        createFramebuffers();
-        createTextureImage();
-        createTextureImageView();
-        createTextureSampler();
+        /**/createInstance();
+        /**/setupDebugMessenger();
+        /**/createSurface();
+        /**/pickPhysicalDevice();
+        /**/createLogicalDevice();
+        /**/createSwapChain();
+        /**/createImageViews();
+        /**/createRenderPass();
+        /**/createDescriptorSetLayout();
+        /**/createGraphicsPipeline();
+        /**/createCommandPool();
+        /**/createDepthResources();
+        /**/createFramebuffers();
+        /**/createTextureImage();
+        /**/createTextureImageView();
+        /**/createTextureSampler();
+        /**/createUniformBuffers();
+        /**/createDescriptorPool();
+		/**/createDescriptorSets();
+        /**/createCommandBuffers();
+        /**/createSyncObjects();
         createVertexBuffer();
         createIndexBuffer();
-        createUniformBuffers();
-        createDescriptorPool();
-		createDescriptorSets();
-        createCommandBuffers();
-        createSyncObjects();
     }
 
     void mainLoop() {
@@ -1401,7 +1401,6 @@ private:
 
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-        time = 0;
 
         UniformBufferObject ubo{};
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -1656,6 +1655,23 @@ private:
         }
     }
 
+    bool isDeviceSuitable(VkPhysicalDevice device) {
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+        bool swapChainAdequate = false;
+        if (extensionsSupported) {
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        }
+
+        VkPhysicalDeviceFeatures supportedFeatures;
+        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+        return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+    }
+
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
         SwapChainSupportDetails details;
 
@@ -1678,23 +1694,6 @@ private:
         }
 
         return details;
-    }
-
-    bool isDeviceSuitable(VkPhysicalDevice device) {
-        QueueFamilyIndices indices = findQueueFamilies(device);
-
-        bool extensionsSupported = checkDeviceExtensionSupport(device);
-
-        bool swapChainAdequate = false;
-        if (extensionsSupported) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
-            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-        }
-
-        VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
-
-        return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
     }
 
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
