@@ -6,10 +6,12 @@
 #include <algorithm>
 #include <fstream>
 #include "ImageHelpers.h"
+#include "DescriptorSetBuilder.h"
 
 Texture* VulkanSetup::texture = nullptr;
 
 const int MAX_FRAMES_IN_FLIGHT = 3;
+const int MAX_MODELS = 50;
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -40,17 +42,15 @@ void VulkanSetup::InitializeVulkan()
     createCommandPool();
     createDepthResources();
     createFramebuffers();
-
-
     createUniformBuffers();
     createDescriptorPool();
     createCommandBuffers();
     createSyncObjects();
 
-    texture = new Texture("resources/viking_room.png");
-    createDescriptorSets();
-    createVertexBuffer();
-    createIndexBuffer();
+    //texture = new Texture("resources/viking_room.png");
+    //createDescriptorSets();
+    //createVertexBuffer();
+    //createIndexBuffer();
 }
 
 void VulkanSetup::cleanupSwapChain() {
@@ -92,11 +92,11 @@ void VulkanSetup::cleanup()
 
     vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->descriptorSetLayout, nullptr);
 
-    vkDestroyBuffer(CONTEXT->device, CONTEXT->indexBuffer, nullptr);
-    vkFreeMemory(CONTEXT->device, CONTEXT->indexBufferMemory, nullptr);
+    //vkDestroyBuffer(CONTEXT->device, CONTEXT->indexBuffer, nullptr);
+    //vkFreeMemory(CONTEXT->device, CONTEXT->indexBufferMemory, nullptr);
 
-    vkDestroyBuffer(CONTEXT->device, CONTEXT->vertexBuffer, nullptr);
-    vkFreeMemory(CONTEXT->device, CONTEXT->vertexBufferMemory, nullptr);
+    //vkDestroyBuffer(CONTEXT->device, CONTEXT->vertexBuffer, nullptr);
+    //vkFreeMemory(CONTEXT->device, CONTEXT->vertexBufferMemory, nullptr);
 
     vkDestroyPipeline(CONTEXT->device, CONTEXT->graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(CONTEXT->device, CONTEXT->pipelineLayout, nullptr);
@@ -601,15 +601,15 @@ void VulkanSetup::createUniformBuffers() {
 void VulkanSetup::createDescriptorPool() {
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
 
     if (vkCreateDescriptorPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
@@ -617,49 +617,64 @@ void VulkanSetup::createDescriptorPool() {
 }
 
 void VulkanSetup::createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, CONTEXT->descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = CONTEXT->descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts = layouts.data();
+    //std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, CONTEXT->descriptorSetLayout);
+    //VkDescriptorSetAllocateInfo allocInfo{};
+    //allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    //allocInfo.descriptorPool = CONTEXT->descriptorPool;
+    //allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    //allocInfo.pSetLayouts = layouts.data();
+    //
+    //CONTEXT->descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    //if (vkAllocateDescriptorSets(CONTEXT->device, &allocInfo, CONTEXT->descriptorSets.data()) != VK_SUCCESS) {
+    //    throw std::runtime_error("failed to allocate descriptor sets!");
+    //}
+    //
+    //for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    //    VkDescriptorBufferInfo bufferInfo{};
+    //    bufferInfo.buffer = CONTEXT->uniformBuffers[i];
+    //    bufferInfo.offset = 0;
+    //    bufferInfo.range = sizeof(UniformBufferObject);
+    //
+    //    VkDescriptorImageInfo imageInfo{};
+    //    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //    imageInfo.imageView = texture->textureImageView;
+    //    imageInfo.sampler = texture->textureSampler;
+    //
+    //    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+    //
+    //    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    //    descriptorWrites[0].dstSet = CONTEXT->descriptorSets[i];
+    //    descriptorWrites[0].dstBinding = 0;
+    //    descriptorWrites[0].dstArrayElement = 0;
+    //    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    //    descriptorWrites[0].descriptorCount = 1;
+    //    descriptorWrites[0].pBufferInfo = &bufferInfo;
+    //
+    //    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    //    descriptorWrites[1].dstSet = CONTEXT->descriptorSets[i];
+    //    descriptorWrites[1].dstBinding = 1;
+    //    descriptorWrites[1].dstArrayElement = 0;
+    //    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    //    descriptorWrites[1].descriptorCount = 1;
+    //    descriptorWrites[1].pImageInfo = &imageInfo;
+    //
+    //    vkUpdateDescriptorSets(CONTEXT->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    //}
 
-    CONTEXT->descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(CONTEXT->device, &allocInfo, CONTEXT->descriptorSets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
+    //VkDescriptorBufferInfo bufferInfo{};
+    //bufferInfo.offset = 0;
+    //bufferInfo.range = sizeof(UniformBufferObject);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = CONTEXT->uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
+    //VkDescriptorImageInfo imageInfo{};
+    //imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //imageInfo.imageView = texture->textureImageView;
+    //imageInfo.sampler = texture->textureSampler;
 
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = texture->textureImageView;
-        imageInfo.sampler = texture->textureSampler;
-
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = CONTEXT->descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = CONTEXT->descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-
-        vkUpdateDescriptorSets(CONTEXT->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    }
+    //DescriptorSetBuilder descriptorSetBuilder{};
+    //CONTEXT->descriptorSets = descriptorSetBuilder
+    //    .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
+    //    .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageInfo)
+    //    .Build();
 }
 
 void VulkanSetup::createCommandBuffers() {
@@ -699,43 +714,43 @@ void VulkanSetup::createSyncObjects() {
 }
 
 void VulkanSetup::createVertexBuffer() {
-    VkDeviceSize bufferSize = sizeof(CONTEXT->vertices[0]) * CONTEXT->vertices.size();
+    //VkDeviceSize bufferSize = sizeof(CONTEXT->vertices[0]) * CONTEXT->vertices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    //VkBuffer stagingBuffer;
+    //VkDeviceMemory stagingBufferMemory;
+    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-    void* data;
-    vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, CONTEXT->vertices.data(), (size_t)bufferSize);
-    vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
+    //void* data;
+    //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    //memcpy(data, CONTEXT->vertices.data(), (size_t)bufferSize);
+    //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
 
-    BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->vertexBuffer, CONTEXT->vertexBufferMemory);
+    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->vertexBuffer, CONTEXT->vertexBufferMemory);
 
-    BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->vertexBuffer, bufferSize);
+    //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->vertexBuffer, bufferSize);
 
-    vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
-    vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
+    //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
+    //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }
 
 void VulkanSetup::createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(CONTEXT->indices[0]) * CONTEXT->indices.size();
+    //VkDeviceSize bufferSize = sizeof(CONTEXT->indices[0]) * CONTEXT->indices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    //VkBuffer stagingBuffer;
+    //VkDeviceMemory stagingBufferMemory;
+    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-    void* data;
-    vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, CONTEXT->indices.data(), (size_t)bufferSize);
-    vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
+    //void* data;
+    //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    //memcpy(data, CONTEXT->indices.data(), (size_t)bufferSize);
+    //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
 
-    BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->indexBuffer, CONTEXT->indexBufferMemory);
+    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->indexBuffer, CONTEXT->indexBufferMemory);
 
-    BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->indexBuffer, bufferSize);
+    //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->indexBuffer, bufferSize);
 
-    vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
-    vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
+    //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
+    //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }
 
 

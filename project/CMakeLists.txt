@@ -13,10 +13,12 @@ set(SOURCES
     "src/Application2.h" 
     "src/Scene.h" 
     "src/Scene.cpp"
+    "src/Model.h"
+    "src/Model.cpp"
 )
 
 # Create the executable
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES} "src/DescriptorSetBuilder.h")
 
 # Copy resources to output folder
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

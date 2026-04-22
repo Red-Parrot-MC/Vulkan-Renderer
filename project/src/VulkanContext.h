@@ -43,24 +43,28 @@ public:
     uint32_t currentFrame = 0;
     bool framebufferResized = false;
 
-    VkBuffer vertexBuffer{};
-    VkDeviceMemory vertexBufferMemory{};
-    VkBuffer indexBuffer{};
-    VkDeviceMemory indexBufferMemory{};
 
     std::vector<VkBuffer> uniformBuffers{};
     std::vector<VkDeviceMemory> uniformBuffersMemory{};
     std::vector<void*> uniformBuffersMapped{};
 
     VkDescriptorPool descriptorPool{};
-    std::vector<VkDescriptorSet> descriptorSets{};
 
     VkImage depthImage{};
     VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
-    std::vector<Vertex> vertices{};
-    std::vector<uint16_t> indices{};
+
+    //VkBuffer vertexBuffer{};
+    //VkDeviceMemory vertexBufferMemory{};
+    //VkBuffer indexBuffer{};
+    //VkDeviceMemory indexBufferMemory{};
+
+    //std::vector<VkDescriptorSet> descriptorSets{};
+    //std::vector<Vertex> vertices{};
+    //std::vector<uint16_t> indices{};
+
+    const int MAX_FRAMES_IN_FLIGHT{ 3 };
 };
 
 class CurrentVulkanContext
