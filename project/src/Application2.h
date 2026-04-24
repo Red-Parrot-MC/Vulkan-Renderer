@@ -8,6 +8,7 @@
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include "Scene.h"
+#include "Camera.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -23,8 +24,8 @@ public:
 	{
         CONTEXT = new VulkanContext();
 		initWindow();
-		initModels();
 		initVulkan();
+		initModels();
 		mainLoop();
 		cleanup();
 	}
@@ -33,6 +34,7 @@ private:
 
     std::vector<Texture*> textures;
     Scene* scene;
+    Camera camera{};
 
 	void initWindow()
 	{
@@ -45,96 +47,33 @@ private:
 		glfwSetFramebufferSizeCallback(CONTEXT->window, framebufferResizeCallback);
 	}
 
-    void initModels()
-    {
-        //CONTEXT->vertices.clear();
-
-        //std::string inputfile = "resources/viking_room.obj";
-        //tinyobj::ObjReaderConfig reader_config;
-        //tinyobj::ObjReader reader;
-
-        //if (!reader.ParseFromFile(inputfile, reader_config)) {
-        //    if (!reader.Error().empty()) {
-        //        std::cerr << "TinyObjReader: " << reader.Error();
-        //    }
-        //    exit(1);
-        //}
-
-        //if (!reader.Warning().empty()) {
-        //    //std::cout << "TinyObjReader: " << reader.Warning();
-        //}
-
-        //auto& attrib = reader.GetAttrib();
-        //auto& shapes = reader.GetShapes();
-        //auto& materials = reader.GetMaterials();
-
-        //// Loop over shapes
-        //for (size_t s = 0; s < shapes.size(); s++) {
-        //    // Loop over faces(polygon)
-        //    size_t index_offset = 0;
-        //    for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-        //        size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
-
-        //        // Loop over vertices in the face.
-        //        for (size_t v = 0; v < fv; v++) {
-        //            Vertex vertex{};
-
-        //            // access to vertex
-        //            tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-        //            tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-        //            tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-        //            tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
-
-        //            vertex.pos = { vx, vy, vz };
-
-        //            // Check if `normal_index` is zero or positive. negative = no normal data
-        //            if (idx.normal_index >= 0) {
-        //                tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
-        //                tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
-        //                tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-
-        //                //vertex.normal = { nx, ny, nz };
-        //            }
-
-        //            // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-        //            if (idx.texcoord_index >= 0) {
-        //                tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-        //                tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-
-        //                vertex.texCoord = { tx, -ty };
-        //            }
-
-        //            CONTEXT->vertices.push_back(vertex);
-        //        }
-        //        index_offset += fv;
-
-        //        // per-face material
-        //        shapes[s].mesh.material_ids[f];
-        //    }
-        //}
-
-        //for (size_t i = 0; i < CONTEXT->vertices.size(); i++) CONTEXT->indices.push_back(i);
-    }
-
 	void initVulkan()
 	{
         VulkanSetup::InitializeVulkan();
         scene = new Scene{};
-
-        textures.push_back(new Texture("resources/viking_room.png"));
-        scene->LoadOBJ("resources/viking_room.obj");
-        scene->models[0]->textures.push_back(textures[0]);
-        scene->models[0]->Initialize();
-
-        textures.push_back(new Texture("resources/monkey.png"));
-        scene->LoadOBJ("resources/monkey.obj");
-        scene->models[1]->textures.push_back(textures[1]);
-        scene->models[1]->Initialize();
 	}
+
+    void initModels()
+    {
+        //textures.push_back(new Texture("resources/viking_room.png"));
+        //scene->LoadOBJ("resources/viking_room.obj");
+        //scene->models[0]->textures.push_back(textures[0]);
+        //scene->models[0]->Initialize();
+
+        //textures.push_back(new Texture("resources/monkey.png"));
+        //scene->LoadOBJ("resources/monkey.obj");
+        //scene->models[1]->textures.push_back(textures[1]);
+        //scene->models[1]->Initialize();
+
+        scene->LoadGLTF("resources/sponza/Sponza.gltf");
+
+        std::cout << "\n\n\nCONTROLS: \n\tMoving: [WASDQE] \n\tLooking: [ARROWS / RMB]\n\n";
+    }
 
 	void mainLoop()
 	{
         clock_t fpsTimerStart = clock();
+        clock_t prevFrame = clock();
         int fpsFrameCount = 0;
 
         std::string title = WINDOW_NAME + " - FPS: ???";
@@ -142,6 +81,11 @@ private:
 
         while (!glfwWindowShouldClose(CONTEXT->window)) {
             glfwPollEvents();
+
+            float deltaTime = (clock() - prevFrame) / float(CLOCKS_PER_SEC);
+            prevFrame = clock();
+
+            camera.Update(deltaTime);
             drawFrame();
 
             fpsFrameCount++;
@@ -183,7 +127,7 @@ private:
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || CONTEXT->framebufferResized) {
             CONTEXT->framebufferResized = false;
-            //recreateSwapChain();
+            VulkanSetup::recreateSwapChain();
             return;
         }
         else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -234,7 +178,7 @@ private:
         result = vkQueuePresentKHR(CONTEXT->presentQueue, &presentInfo);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            //recreateSwapChain();
+            VulkanSetup::recreateSwapChain();
         }
         else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
@@ -308,9 +252,10 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), CONTEXT->swapChainExtent.width / (float)CONTEXT->swapChainExtent.height, 0.1f, 10.0f);
+        //ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.model = glm::mat4(1.0f);
+        ubo.view = glm::lookAt(camera.origin, camera.origin + camera.forward, camera.up);
+        ubo.proj = glm::perspective(glm::radians(camera.fov), CONTEXT->swapChainExtent.width / (float)CONTEXT->swapChainExtent.height, camera.nearPlane, camera.farPlane);
         ubo.proj[1][1] *= -1;
 
         memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));

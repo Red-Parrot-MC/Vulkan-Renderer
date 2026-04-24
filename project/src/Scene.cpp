@@ -7,7 +7,10 @@
 #define TINYGLTF3_IMPLEMENTATION
 #define TINYGLTF3_ENABLE_FS          // enable file I/O
 #define TINYGLTF3_ENABLE_STB_IMAGE   // enable image decoding
+#pragma warning(disable : 4996) // release mode doesn't build without this
 #include <tiny_gltf_v3.h>
+#include <unordered_map>
+#pragma warning(default : 4996)
 
 Scene::Scene()
 {
@@ -20,6 +23,13 @@ Scene::~Scene()
     {
         delete model;
     }
+    models.clear();
+
+    for (Texture* texture : textures)
+    {
+        delete texture;
+    }
+    textures.clear();
 }
 
 bool Scene::LoadOBJ(std::string filename)
@@ -92,29 +102,170 @@ bool Scene::LoadOBJ(std::string filename)
         }
     }
 
-    for (size_t i = 0; i < model->vertices.size(); i++) model->indices.push_back(i);
+    for (size_t i = 0; i < model->vertices.size(); i++) model->indices.push_back((uint32_t)i);
 
     models.push_back(model);
-
 	return true;
 }
 
 bool Scene::LoadGLTF(std::string filename)
 {
-	tinygltf3::Model model{};
+	tinygltf3::Model gltfModel{};
 	tinygltf3::ErrorStack errorStack{};
 
-	tg3_error_code errorCode = tinygltf3::parse_file(model, errorStack, filename.c_str());
+	tg3_error_code errorCode = tinygltf3::parse_file(gltfModel, errorStack, filename.c_str());
 
 	for (uint32_t i = 0; i < errorStack.count(); i++)
 	{
-		std::cerr << errorStack.entry(i)->message;
+		std::cerr << "GLTF: " << errorStack.entry(i)->message;
 	}
 
 	if (errorCode != tg3_error_code::TG3_OK)
 	{
 		return false;
 	}
+
+    tg3_model* tg3Model = gltfModel.get();
+
+    for (size_t i = 0; i < filename.size(); i++) 
+        if (filename[i] == '\\') 
+            filename[i] = '/';
+
+    std::string baseUri = filename.substr(0, filename.find_last_of('/')) + '/';
+    std::cout << "BaseUri: " << baseUri << '\n';
+
+    std::cout << tg3Model->accessors_count << std::endl;
+    std::cout << tg3Model->buffers_count << std::endl;
+    std::cout << tg3Model->buffer_views_count << std::endl;
+    std::cout << tg3Model->materials_count << std::endl;
+    std::cout << tg3Model->meshes_count << std::endl;
+    std::cout << tg3Model->nodes_count << std::endl;
+    std::cout << tg3Model->textures_count << std::endl;
+
+    std::vector<Model*> models{};
+    std::unordered_map<const char*, Texture*> loadedTextures{};
+
+    std::cout << std::endl;
+
+    for (uint32_t meshIndex = 0; meshIndex < tg3Model->meshes_count; meshIndex++)
+    {
+        tg3_mesh mesh = tg3Model->meshes[meshIndex];
+
+        for (uint32_t primitiveIndex = 0; primitiveIndex < tg3Model->meshes->primitives_count; primitiveIndex++)
+        {
+            tg3_primitive primitive = mesh.primitives[primitiveIndex];
+            tg3_accessor accessor = tg3Model->accessors[primitive.indices];
+            tg3_buffer_view view = tg3Model->buffer_views[accessor.buffer_view];
+            tg3_buffer buffer = tg3Model->buffers[view.buffer];
+            const uint8_t* data = buffer.data.data + view.byte_offset + accessor.byte_offset;
+            size_t count = buffer.data.count;
+
+            std::cout << "Primitive: " << primitiveIndex << " Accessor: " << primitive.indices << " View: " << accessor.buffer_view << " Buffer: " << view.buffer << " Buffer size: " << buffer.data.count << std::endl;
+            std::cout << "Accessor.count: " << accessor.count << " Accessor byte offset: " << accessor.byte_offset << " View byte offset: " << view.byte_offset << "\n";
+            std::cout << "Component type: " << accessor.component_type << '\n';
+
+            Model* model = new Model();
+            models.push_back(model);
+            const uint8_t* uint8Data{};
+            const uint16_t* uint16Data{};
+            const uint32_t* uint32Data{};
+
+            switch (accessor.component_type)
+            {
+            case TG3_COMPONENT_TYPE_UNSIGNED_BYTE:
+                uint8Data = reinterpret_cast<const uint8_t*>(data);
+                model->indices = { uint8Data, uint8Data + accessor.count };
+                break;
+            case TG3_COMPONENT_TYPE_UNSIGNED_SHORT:
+                uint16Data = reinterpret_cast<const uint16_t*>(data);
+                model->indices = { uint16Data, uint16Data + accessor.count };
+                break;
+            case TG3_COMPONENT_TYPE_UNSIGNED_INT:
+                uint32Data = reinterpret_cast<const uint32_t*>(data);
+                model->indices = { uint32Data, uint32Data + accessor.count };
+                break;
+            }
+
+            std::cout << std::endl;
+            std::vector<glm::vec3> positions{};
+            std::vector<glm::vec3> normals{};
+            std::vector<glm::vec4> tangents{};
+            std::vector<glm::vec2> texcoords{};
+
+            for (uint32_t attributeIndex = 0; attributeIndex < primitive.attributes_count; attributeIndex++)
+            {
+                tg3_str_int_pair attribute = primitive.attributes[attributeIndex];
+                std::string key = attribute.key.data;
+                accessor = tg3Model->accessors[attribute.value];
+                view = tg3Model->buffer_views[accessor.buffer_view];
+                buffer = tg3Model->buffers[view.buffer];
+                data = buffer.data.data + view.byte_offset + accessor.byte_offset;
+
+                std::cout << attribute.key.data << ", " << accessor.component_type << ", " << accessor.type << '\n';
+
+                if (key == "POSITION")
+                {
+                    const glm::vec3* vec3Data = reinterpret_cast<const glm::vec3*>(data);
+                    positions = { vec3Data, vec3Data + accessor.count };
+                }
+                if (key == "NORMAL")
+                {
+                    const glm::vec3* vec3Data = reinterpret_cast<const glm::vec3*>(data);
+                    normals = { vec3Data, vec3Data + accessor.count };
+                }
+                if (key == "TEXCOORD_0")
+                {
+                    const glm::vec2* vec2Data = reinterpret_cast<const glm::vec2*>(data);
+                    texcoords = { vec2Data, vec2Data + accessor.count };
+                }
+                if (key == "TANGENT")
+                {
+                    const glm::vec4* vec4Data = reinterpret_cast<const glm::vec4*>(data);
+                    tangents = { vec4Data, vec4Data + accessor.count };
+                }
+            }
+
+            model->vertices.reserve(positions.size());
+            glm::vec3 scale = { tg3Model->nodes->scale[0], tg3Model->nodes->scale[1], tg3Model->nodes->scale[2]};
+
+            for (size_t i = 0; i < positions.size(); i++)
+            {
+                Vertex vertex{};
+                vertex.pos = positions[i] * scale;
+                if (normals.size() > i)
+                    vertex.normal = normals[i];
+                if (tangents.size() > i)
+                    vertex.tangent = tangents[i];
+                if (texcoords.size() > i)
+                    vertex.texCoord = texcoords[i];
+
+                model->vertices.push_back(vertex);
+            }
+
+            tg3_material material = tg3Model->materials[primitive.material];
+            tg3_texture_info textureInfo = material.pbr_metallic_roughness.base_color_texture;
+            tg3_image image = tg3Model->images[tg3Model->textures[textureInfo.index].source];
+
+            // prevent textures from loading more than once
+            Texture* texture = loadedTextures[image.uri.data];
+            if (texture == nullptr)
+            {
+                texture = new Texture(std::string(baseUri + image.uri.data).c_str());
+                loadedTextures[image.uri.data] = texture;
+                textures.push_back(texture);
+            }
+
+            model->textures.push_back(texture);
+        }
+    }
+
+    for (Model* model : models)
+    {
+        model->Initialize();
+        this->models.push_back(model);
+    }
+
+    std::cout << "Texture count: " << textures.size() << '\n';
 
 	return true;
 }
@@ -166,7 +317,7 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        vkCmdBindIndexBuffer(commandBuffer, models[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(commandBuffer, models[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &models[i]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
 

@@ -11,7 +11,7 @@
 Texture* VulkanSetup::texture = nullptr;
 
 const int MAX_FRAMES_IN_FLIGHT = 3;
-const int MAX_MODELS = 50;
+const int MAX_MODELS = 200;
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -43,14 +43,44 @@ void VulkanSetup::InitializeVulkan()
     createDepthResources();
     createFramebuffers();
     createUniformBuffers();
-    createDescriptorPool();
     createCommandBuffers();
     createSyncObjects();
+    createDescriptorPool();
 
     //texture = new Texture("resources/viking_room.png");
     //createDescriptorSets();
     //createVertexBuffer();
     //createIndexBuffer();
+}
+
+void VulkanSetup::recreateSwapChain() {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(CONTEXT->window, &width, &height);
+    while (width == 0 || height == 0) {
+        if (glfwWindowShouldClose(CONTEXT->window))
+            break;
+
+        glfwGetFramebufferSize(CONTEXT->window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    if (glfwWindowShouldClose(CONTEXT->window)) return;
+
+    vkDeviceWaitIdle(CONTEXT->device);
+    cleanupSwapChain();
+
+    createSwapChain();
+    createImageViews();
+    createDepthResources();
+    createFramebuffers();
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(CONTEXT->device, CONTEXT->renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(CONTEXT->device, CONTEXT->imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(CONTEXT->device, CONTEXT->inFlightFences[i], nullptr);
+    }
+
+    createSyncObjects();
 }
 
 void VulkanSetup::cleanupSwapChain() {
@@ -616,6 +646,42 @@ void VulkanSetup::createDescriptorPool() {
     }
 }
 
+void VulkanSetup::createCommandBuffers() {
+    CONTEXT->commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = CONTEXT->commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (uint32_t)CONTEXT->commandBuffers.size();
+
+    if (vkAllocateCommandBuffers(CONTEXT->device, &allocInfo, CONTEXT->commandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
+    }
+}
+
+void VulkanSetup::createSyncObjects() {
+    CONTEXT->imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(CONTEXT->device, &fenceInfo, nullptr, &CONTEXT->inFlightFences[i]) != VK_SUCCESS) {
+
+            throw std::runtime_error("failed to create synchronization objects for a frame!");
+        }
+    }
+}
+
 void VulkanSetup::createDescriptorSets() {
     //std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, CONTEXT->descriptorSetLayout);
     //VkDescriptorSetAllocateInfo allocInfo{};
@@ -664,12 +730,12 @@ void VulkanSetup::createDescriptorSets() {
     //VkDescriptorBufferInfo bufferInfo{};
     //bufferInfo.offset = 0;
     //bufferInfo.range = sizeof(UniformBufferObject);
-
+    //
     //VkDescriptorImageInfo imageInfo{};
     //imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     //imageInfo.imageView = texture->textureImageView;
     //imageInfo.sampler = texture->textureSampler;
-
+    //
     //DescriptorSetBuilder descriptorSetBuilder{};
     //CONTEXT->descriptorSets = descriptorSetBuilder
     //    .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
@@ -677,78 +743,42 @@ void VulkanSetup::createDescriptorSets() {
     //    .Build();
 }
 
-void VulkanSetup::createCommandBuffers() {
-    CONTEXT->commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = CONTEXT->commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t)CONTEXT->commandBuffers.size();
-
-    if (vkAllocateCommandBuffers(CONTEXT->device, &allocInfo, CONTEXT->commandBuffers.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate command buffers!");
-    }
-}
-
-void VulkanSetup::createSyncObjects() {
-    CONTEXT->imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        if (vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(CONTEXT->device, &fenceInfo, nullptr, &CONTEXT->inFlightFences[i]) != VK_SUCCESS) {
-
-            throw std::runtime_error("failed to create synchronization objects for a frame!");
-        }
-    }
-}
-
 void VulkanSetup::createVertexBuffer() {
     //VkDeviceSize bufferSize = sizeof(CONTEXT->vertices[0]) * CONTEXT->vertices.size();
-
+    //
     //VkBuffer stagingBuffer;
     //VkDeviceMemory stagingBufferMemory;
     //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
+    //
     //void* data;
     //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
     //memcpy(data, CONTEXT->vertices.data(), (size_t)bufferSize);
     //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
-
+    //
     //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->vertexBuffer, CONTEXT->vertexBufferMemory);
-
+    //
     //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->vertexBuffer, bufferSize);
-
+    //
     //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
     //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }
 
 void VulkanSetup::createIndexBuffer() {
     //VkDeviceSize bufferSize = sizeof(CONTEXT->indices[0]) * CONTEXT->indices.size();
-
+    //
     //VkBuffer stagingBuffer;
     //VkDeviceMemory stagingBufferMemory;
     //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
+    //
     //void* data;
     //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
     //memcpy(data, CONTEXT->indices.data(), (size_t)bufferSize);
     //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
-
+    //
     //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->indexBuffer, CONTEXT->indexBufferMemory);
-
+    //
     //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->indexBuffer, bufferSize);
-
+    //
     //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
     //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }

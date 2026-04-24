@@ -14,10 +14,7 @@ public:
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 	std::vector<Model*> models{};
+	std::vector<Texture*> textures{}; // textures loaded by LoadGLTF
 private:
 
-	//std::vector<Vertex> vertices{};
-	//std::vector<uint16_t> indices{};
-
-	//std::vector<Texture*> textures{};
 };

@@ -18,23 +18,35 @@ set(SOURCES
 )
 
 # Create the executable
-add_executable(${PROJECT_NAME} ${SOURCES} "src/DescriptorSetBuilder.h")
+add_executable(${PROJECT_NAME} ${SOURCES} "src/DescriptorSetBuilder.h" "src/Camera.h")
 
-# Copy resources to output folder
+# Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(GLOB_RECURSE RESOURCE_FILES
     "${RESOURCES_SOURCE_DIR}/*.jpg"
     "${RESOURCES_SOURCE_DIR}/*.png"
     "${RESOURCES_SOURCE_DIR}/*.obj"
     "${RESOURCES_SOURCE_DIR}/*.fx"
+    "${RESOURCES_SOURCE_DIR}/*.gltf"
+    "${RESOURCES_SOURCE_DIR}/*.bin"
 )
 set(RESOURCES_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/resources/")
 file(MAKE_DIRECTORY ${RESOURCES_OUT_DIR})
 foreach(RESOURCE ${RESOURCE_FILES})
+    # Compute path relative to the resources source dir
+    file(RELATIVE_PATH REL_PATH "${RESOURCES_SOURCE_DIR}" "${RESOURCE}")
+    # Get directory component of the relative path
+    get_filename_component(REL_DIR "${REL_PATH}" DIRECTORY)
+    if(REL_DIR STREQUAL ".")
+        set(DEST_DIR "${RESOURCES_OUT_DIR}")
+    else()
+        set(DEST_DIR "${RESOURCES_OUT_DIR}/${REL_DIR}")
+    endif()
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${RESOURCE}
-    ${RESOURCES_OUT_DIR})
-endforeach(RESOURCE)
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEST_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy "${RESOURCE}" "${DEST_DIR}"
+    )
+endforeach()
 
 # Compile shaders
 set(SHADER_COMPILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")

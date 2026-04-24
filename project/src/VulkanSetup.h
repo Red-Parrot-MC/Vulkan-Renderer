@@ -7,6 +7,7 @@ class VulkanSetup
 {
 public:
 	static void InitializeVulkan();
+    static void recreateSwapChain();
     static void cleanupSwapChain();
     static void cleanup();
 
