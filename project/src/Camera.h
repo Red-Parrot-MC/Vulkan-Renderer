@@ -18,10 +18,13 @@ public:
 	float pitch{};
 	float yaw{};
 
-	double cursorX{};
-	double cursorY{};
 
 	void Update(float deltaTime)
+	{
+		calculateDirections();
+	}
+
+	void ApplyDefaultMovement(float deltaTime)
 	{
 		float moveSpeed{ 5 };
 		float rotateSpeed{ 1 };
@@ -55,12 +58,12 @@ public:
 
 		if (pitch < -PI / 2) pitch = -PI / 2;
 		if (pitch > PI / 2) pitch = PI / 2;
-
-		calculateDirections();
 	}
 
 private:
 
+	double cursorX{};
+	double cursorY{};
 
 	void calculateDirections()
 	{

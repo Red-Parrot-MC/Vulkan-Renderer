@@ -2,10 +2,10 @@
 #include <iostream>
 
 int main() {
-    HelloTriangleApplication app;
+    BaseApplication* app = new Application();
 
     try {
-        app.run();
+        app->run();
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

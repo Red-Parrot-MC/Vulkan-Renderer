@@ -9,14 +9,14 @@ add_executable(${PROJECT_NAME}
     "src/VulkanSetup.h"
     "src/VulkanSetup.cpp"
     "src/structs.h"
-    "src/Application.h" 
+    "src/BaseApplication.h" 
     "src/Scene.h" 
     "src/Scene.cpp"
     "src/Model.h"
     "src/Model.cpp"
     "src/DescriptorSetBuilder.h" 
     "src/Camera.h"
-)
+ "src/Application.h" "src/Application.cpp")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
