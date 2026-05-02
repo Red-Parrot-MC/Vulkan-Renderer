@@ -1,7 +1,6 @@
-# Source files
-set(SOURCES 
-	"src/main.cpp"
-	"src/Application.h"
+# Create the executable
+add_executable(${PROJECT_NAME} 
+    "src/main.cpp"
     "src/VulkanContext.h"
     "src/BufferHelpers.h"
     "src/ImageHelpers.h"
@@ -10,15 +9,14 @@ set(SOURCES
     "src/VulkanSetup.h"
     "src/VulkanSetup.cpp"
     "src/structs.h"
-    "src/Application2.h" 
+    "src/Application.h" 
     "src/Scene.h" 
     "src/Scene.cpp"
     "src/Model.h"
     "src/Model.cpp"
+    "src/DescriptorSetBuilder.h" 
+    "src/Camera.h"
 )
-
-# Create the executable
-add_executable(${PROJECT_NAME} ${SOURCES} "src/DescriptorSetBuilder.h" "src/Camera.h")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

@@ -27,7 +27,6 @@ private:
     static void createFramebuffers();
     static void createUniformBuffers();
     static void createDescriptorPool();
-    static void createDescriptorSets();
     static void createCommandBuffers();
     static void createSyncObjects();
     static void createVertexBuffer();
@@ -46,11 +45,8 @@ private:
     static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    static VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
     static VkFormat findDepthFormat();
     static VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     static std::vector<char> readFile(const std::string& filename);
     static VkShaderModule createShaderModule(const std::vector<char>& code);
-
-    static Texture* texture;
 };

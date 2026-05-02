@@ -6,7 +6,7 @@
 class Camera
 {
 public:
-	glm::vec3 origin{ 0, 0, 0 };
+	glm::vec3 origin{ 0, 1, 0 };
 	float fov{ 45.f };
 	float nearPlane{ 0.1f };
 	float farPlane{ 100.f };
@@ -33,8 +33,8 @@ public:
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_S)) origin -= forward * moveSpeed * deltaTime;
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_A)) origin += right * moveSpeed * deltaTime;
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_D)) origin -= right * moveSpeed * deltaTime;
-		if (glfwGetKey(CONTEXT->window, GLFW_KEY_E)) origin.y += moveSpeed * deltaTime;
-		if (glfwGetKey(CONTEXT->window, GLFW_KEY_Q)) origin.y -= moveSpeed * deltaTime;
+		if (glfwGetKey(CONTEXT->window, GLFW_KEY_E)) origin += up * moveSpeed * deltaTime;
+		if (glfwGetKey(CONTEXT->window, GLFW_KEY_Q)) origin -= up * moveSpeed * deltaTime;
 
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_LEFT)) yaw -= rotateSpeed * deltaTime;
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_RIGHT)) yaw += rotateSpeed * deltaTime;
@@ -46,8 +46,8 @@ public:
 
 		if (glfwGetMouseButton(CONTEXT->window, GLFW_MOUSE_BUTTON_2))
 		{
-			yaw += (newCursorX - cursorX) * mouseSensitivity / 100;
-			pitch -= (newCursorY - cursorY) * mouseSensitivity / 100;
+			yaw += float(newCursorX - cursorX) * mouseSensitivity / 100;
+			pitch -= float(newCursorY - cursorY) * mouseSensitivity / 100;
 		}
 
 		cursorX = newCursorX;

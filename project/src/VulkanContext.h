@@ -52,16 +52,6 @@ public:
     VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
-
-    //VkBuffer vertexBuffer{};
-    //VkDeviceMemory vertexBufferMemory{};
-    //VkBuffer indexBuffer{};
-    //VkDeviceMemory indexBufferMemory{};
-
-    //std::vector<VkDescriptorSet> descriptorSets{};
-    //std::vector<Vertex> vertices{};
-    //std::vector<uint16_t> indices{};
-
     const int MAX_FRAMES_IN_FLIGHT{ 3 };
 };
 

@@ -8,8 +8,6 @@
 #include "ImageHelpers.h"
 #include "DescriptorSetBuilder.h"
 
-Texture* VulkanSetup::texture = nullptr;
-
 const int MAX_FRAMES_IN_FLIGHT = 3;
 const int MAX_MODELS = 200;
 
@@ -46,11 +44,6 @@ void VulkanSetup::InitializeVulkan()
     createCommandBuffers();
     createSyncObjects();
     createDescriptorPool();
-
-    //texture = new Texture("resources/viking_room.png");
-    //createDescriptorSets();
-    //createVertexBuffer();
-    //createIndexBuffer();
 }
 
 void VulkanSetup::recreateSwapChain() {
@@ -108,25 +101,16 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 void VulkanSetup::cleanup()
 {
-
-    VulkanSetup::cleanupSwapChain();
+    cleanupSwapChain();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
         vkFreeMemory(CONTEXT->device, CONTEXT->uniformBuffersMemory[i], nullptr);
     }
 
-    delete texture;
-
     vkDestroyDescriptorPool(CONTEXT->device, CONTEXT->descriptorPool, nullptr);
 
     vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->descriptorSetLayout, nullptr);
-
-    //vkDestroyBuffer(CONTEXT->device, CONTEXT->indexBuffer, nullptr);
-    //vkFreeMemory(CONTEXT->device, CONTEXT->indexBufferMemory, nullptr);
-
-    //vkDestroyBuffer(CONTEXT->device, CONTEXT->vertexBuffer, nullptr);
-    //vkFreeMemory(CONTEXT->device, CONTEXT->vertexBufferMemory, nullptr);
 
     vkDestroyPipeline(CONTEXT->device, CONTEXT->graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(CONTEXT->device, CONTEXT->pipelineLayout, nullptr);
@@ -158,6 +142,7 @@ void VulkanSetup::cleanup()
 
 
 void VulkanSetup::createInstance() {
+#pragma warning (suppress : 6237, justification : "enableValidationLayers is always false in release mode and that's fine")
     if (enableValidationLayers && !checkValidationLayerSupport()) {
         throw std::runtime_error("validation layers requested, but not available!");
     }
@@ -341,7 +326,7 @@ void VulkanSetup::createImageViews() {
     CONTEXT->swapChainImageViews.resize(CONTEXT->swapChainImages.size());
 
     for (uint32_t i = 0; i < CONTEXT->swapChainImages.size(); i++) {
-        CONTEXT->swapChainImageViews[i] = createImageView(CONTEXT->swapChainImages[i], CONTEXT->swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        CONTEXT->swapChainImageViews[i] = ImageHelpers::createImageView(CONTEXT->swapChainImages[i], CONTEXT->swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 }
 
@@ -585,7 +570,7 @@ void VulkanSetup::createCommandPool() {
 void VulkanSetup::createDepthResources() {
     VkFormat depthFormat = findDepthFormat();
     ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->depthImage, CONTEXT->depthImageMemory);
-    CONTEXT->depthImageView = createImageView(CONTEXT->depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    CONTEXT->depthImageView = ImageHelpers::createImageView(CONTEXT->depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
     ImageHelpers::transitionImageLayout(CONTEXT->depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 }
@@ -680,107 +665,6 @@ void VulkanSetup::createSyncObjects() {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     }
-}
-
-void VulkanSetup::createDescriptorSets() {
-    //std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, CONTEXT->descriptorSetLayout);
-    //VkDescriptorSetAllocateInfo allocInfo{};
-    //allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    //allocInfo.descriptorPool = CONTEXT->descriptorPool;
-    //allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    //allocInfo.pSetLayouts = layouts.data();
-    //
-    //CONTEXT->descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    //if (vkAllocateDescriptorSets(CONTEXT->device, &allocInfo, CONTEXT->descriptorSets.data()) != VK_SUCCESS) {
-    //    throw std::runtime_error("failed to allocate descriptor sets!");
-    //}
-    //
-    //for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    //    VkDescriptorBufferInfo bufferInfo{};
-    //    bufferInfo.buffer = CONTEXT->uniformBuffers[i];
-    //    bufferInfo.offset = 0;
-    //    bufferInfo.range = sizeof(UniformBufferObject);
-    //
-    //    VkDescriptorImageInfo imageInfo{};
-    //    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //    imageInfo.imageView = texture->textureImageView;
-    //    imageInfo.sampler = texture->textureSampler;
-    //
-    //    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-    //
-    //    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    //    descriptorWrites[0].dstSet = CONTEXT->descriptorSets[i];
-    //    descriptorWrites[0].dstBinding = 0;
-    //    descriptorWrites[0].dstArrayElement = 0;
-    //    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    //    descriptorWrites[0].descriptorCount = 1;
-    //    descriptorWrites[0].pBufferInfo = &bufferInfo;
-    //
-    //    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    //    descriptorWrites[1].dstSet = CONTEXT->descriptorSets[i];
-    //    descriptorWrites[1].dstBinding = 1;
-    //    descriptorWrites[1].dstArrayElement = 0;
-    //    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    //    descriptorWrites[1].descriptorCount = 1;
-    //    descriptorWrites[1].pImageInfo = &imageInfo;
-    //
-    //    vkUpdateDescriptorSets(CONTEXT->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    //}
-
-    //VkDescriptorBufferInfo bufferInfo{};
-    //bufferInfo.offset = 0;
-    //bufferInfo.range = sizeof(UniformBufferObject);
-    //
-    //VkDescriptorImageInfo imageInfo{};
-    //imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //imageInfo.imageView = texture->textureImageView;
-    //imageInfo.sampler = texture->textureSampler;
-    //
-    //DescriptorSetBuilder descriptorSetBuilder{};
-    //CONTEXT->descriptorSets = descriptorSetBuilder
-    //    .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-    //    .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageInfo)
-    //    .Build();
-}
-
-void VulkanSetup::createVertexBuffer() {
-    //VkDeviceSize bufferSize = sizeof(CONTEXT->vertices[0]) * CONTEXT->vertices.size();
-    //
-    //VkBuffer stagingBuffer;
-    //VkDeviceMemory stagingBufferMemory;
-    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-    //
-    //void* data;
-    //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    //memcpy(data, CONTEXT->vertices.data(), (size_t)bufferSize);
-    //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
-    //
-    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->vertexBuffer, CONTEXT->vertexBufferMemory);
-    //
-    //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->vertexBuffer, bufferSize);
-    //
-    //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
-    //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
-}
-
-void VulkanSetup::createIndexBuffer() {
-    //VkDeviceSize bufferSize = sizeof(CONTEXT->indices[0]) * CONTEXT->indices.size();
-    //
-    //VkBuffer stagingBuffer;
-    //VkDeviceMemory stagingBufferMemory;
-    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-    //
-    //void* data;
-    //vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    //memcpy(data, CONTEXT->indices.data(), (size_t)bufferSize);
-    //vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
-    //
-    //BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->indexBuffer, CONTEXT->indexBufferMemory);
-    //
-    //BufferHelpers::copyBuffer(stagingBuffer, CONTEXT->indexBuffer, bufferSize);
-    //
-    //vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
-    //vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }
 
 
@@ -979,26 +863,6 @@ VkExtent2D VulkanSetup::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabil
 
         return actualExtent;
     }
-}
-
-VkImageView VulkanSetup::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    if (vkCreateImageView(CONTEXT->device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create image view!");
-    }
-
-    return imageView;
 }
 
 VkFormat VulkanSetup::findDepthFormat() {

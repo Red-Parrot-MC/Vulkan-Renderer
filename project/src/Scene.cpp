@@ -24,19 +24,13 @@ Scene::~Scene()
         delete model;
     }
     models.clear();
-
-    for (Texture* texture : textures)
-    {
-        delete texture;
-    }
-    textures.clear();
 }
 
 bool Scene::LoadOBJ(std::string filename)
 {
-    Model* model = new Model();
+    Primitive* primitive = new Primitive();
 
-    model->vertices.clear();
+    primitive->vertices.clear();
 
     std::string inputfile = filename;
     tinyobj::ObjReaderConfig reader_config;
@@ -93,16 +87,16 @@ bool Scene::LoadOBJ(std::string filename)
                     vertex.texCoord = { tx, -ty };
                 }
 
-                model->vertices.push_back(vertex);
+                primitive->vertices.push_back(vertex);
             }
             index_offset += fv;
-
-            // per-face material
-            //shapes[s].mesh.material_ids[f];
         }
     }
 
-    for (size_t i = 0; i < model->vertices.size(); i++) model->indices.push_back((uint32_t)i);
+    for (size_t i = 0; i < primitive->vertices.size(); i++) primitive->indices.push_back((uint32_t)i);
+
+    Model* model = new Model();
+    model->primitives.push_back(primitive);
 
     models.push_back(model);
 	return true;
@@ -142,8 +136,8 @@ bool Scene::LoadGLTF(std::string filename)
     std::cout << tg3Model->nodes_count << std::endl;
     std::cout << tg3Model->textures_count << std::endl;
 
-    std::vector<Model*> models{};
-    std::unordered_map<const char*, Texture*> loadedTextures{};
+    Model* model = new Model{};
+    std::unordered_map<const char*, uint32_t> loadedMaterials{};
 
     std::cout << std::endl;
 
@@ -153,19 +147,19 @@ bool Scene::LoadGLTF(std::string filename)
 
         for (uint32_t primitiveIndex = 0; primitiveIndex < tg3Model->meshes->primitives_count; primitiveIndex++)
         {
-            tg3_primitive primitive = mesh.primitives[primitiveIndex];
-            tg3_accessor accessor = tg3Model->accessors[primitive.indices];
+            tg3_primitive tg3Primitive = mesh.primitives[primitiveIndex];
+            tg3_accessor accessor = tg3Model->accessors[tg3Primitive.indices];
             tg3_buffer_view view = tg3Model->buffer_views[accessor.buffer_view];
             tg3_buffer buffer = tg3Model->buffers[view.buffer];
             const uint8_t* data = buffer.data.data + view.byte_offset + accessor.byte_offset;
             size_t count = buffer.data.count;
 
-            std::cout << "Primitive: " << primitiveIndex << " Accessor: " << primitive.indices << " View: " << accessor.buffer_view << " Buffer: " << view.buffer << " Buffer size: " << buffer.data.count << std::endl;
+            std::cout << "Primitive: " << primitiveIndex << " Accessor: " << tg3Primitive.indices << " View: " << accessor.buffer_view << " Buffer: " << view.buffer << " Buffer size: " << buffer.data.count << std::endl;
             std::cout << "Accessor.count: " << accessor.count << " Accessor byte offset: " << accessor.byte_offset << " View byte offset: " << view.byte_offset << "\n";
             std::cout << "Component type: " << accessor.component_type << '\n';
 
-            Model* model = new Model();
-            models.push_back(model);
+            Primitive* primitive = new Primitive();
+            model->primitives.push_back(primitive);
             const uint8_t* uint8Data{};
             const uint16_t* uint16Data{};
             const uint32_t* uint32Data{};
@@ -174,15 +168,15 @@ bool Scene::LoadGLTF(std::string filename)
             {
             case TG3_COMPONENT_TYPE_UNSIGNED_BYTE:
                 uint8Data = reinterpret_cast<const uint8_t*>(data);
-                model->indices = { uint8Data, uint8Data + accessor.count };
+                primitive->indices = { uint8Data, uint8Data + accessor.count };
                 break;
             case TG3_COMPONENT_TYPE_UNSIGNED_SHORT:
                 uint16Data = reinterpret_cast<const uint16_t*>(data);
-                model->indices = { uint16Data, uint16Data + accessor.count };
+                primitive->indices = { uint16Data, uint16Data + accessor.count };
                 break;
             case TG3_COMPONENT_TYPE_UNSIGNED_INT:
                 uint32Data = reinterpret_cast<const uint32_t*>(data);
-                model->indices = { uint32Data, uint32Data + accessor.count };
+                primitive->indices = { uint32Data, uint32Data + accessor.count };
                 break;
             }
 
@@ -192,9 +186,9 @@ bool Scene::LoadGLTF(std::string filename)
             std::vector<glm::vec4> tangents{};
             std::vector<glm::vec2> texcoords{};
 
-            for (uint32_t attributeIndex = 0; attributeIndex < primitive.attributes_count; attributeIndex++)
+            for (uint32_t attributeIndex = 0; attributeIndex < tg3Primitive.attributes_count; attributeIndex++)
             {
-                tg3_str_int_pair attribute = primitive.attributes[attributeIndex];
+                tg3_str_int_pair attribute = tg3Primitive.attributes[attributeIndex];
                 std::string key = attribute.key.data;
                 accessor = tg3Model->accessors[attribute.value];
                 view = tg3Model->buffer_views[accessor.buffer_view];
@@ -225,7 +219,7 @@ bool Scene::LoadGLTF(std::string filename)
                 }
             }
 
-            model->vertices.reserve(positions.size());
+            primitive->vertices.reserve(positions.size());
             glm::vec3 scale = { tg3Model->nodes->scale[0], tg3Model->nodes->scale[1], tg3Model->nodes->scale[2]};
 
             for (size_t i = 0; i < positions.size(); i++)
@@ -239,33 +233,29 @@ bool Scene::LoadGLTF(std::string filename)
                 if (texcoords.size() > i)
                     vertex.texCoord = texcoords[i];
 
-                model->vertices.push_back(vertex);
+                primitive->vertices.push_back(vertex);
             }
 
-            tg3_material material = tg3Model->materials[primitive.material];
+            tg3_material material = tg3Model->materials[tg3Primitive.material];
             tg3_texture_info textureInfo = material.pbr_metallic_roughness.base_color_texture;
             tg3_image image = tg3Model->images[tg3Model->textures[textureInfo.index].source];
 
             // prevent textures from loading more than once
-            Texture* texture = loadedTextures[image.uri.data];
-            if (texture == nullptr)
+            uint32_t materialIndex = loadedMaterials[image.uri.data];
+            if (materialIndex == 0)
             {
-                texture = new Texture(std::string(baseUri + image.uri.data).c_str());
-                loadedTextures[image.uri.data] = texture;
-                textures.push_back(texture);
+                Texture* texture = new Texture(std::string(baseUri + image.uri.data).c_str());
+                model->materials.push_back(new Material{ texture });
+                materialIndex = model->materials.size();
+                loadedMaterials[image.uri.data] = materialIndex;
             }
 
-            model->textures.push_back(texture);
+            primitive->materialIndex = materialIndex - 1;
         }
     }
 
-    for (Model* model : models)
-    {
-        model->Initialize();
-        this->models.push_back(model);
-    }
-
-    std::cout << "Texture count: " << textures.size() << '\n';
+    model->Initialize();
+    models.push_back(model);
 
 	return true;
 }
@@ -311,17 +301,22 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
     scissor.extent = CONTEXT->swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    for (size_t i = 0; i < models.size(); i++)
+    //for (size_t i = 0; i < models.size(); i++)
+    //{
+    //    VkBuffer vertexBuffers[] = { models[i]->vertexBuffer };
+    //    VkDeviceSize offsets[] = { 0 };
+    //    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    //    vkCmdBindIndexBuffer(commandBuffer, models[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    //    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &models[i]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
+
+    //    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(models[i]->indices.size()), 1, 0, 0, 0);
+    //}
+
+    for (Model* model : models)
     {
-        VkBuffer vertexBuffers[] = { models[i]->vertexBuffer };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-        vkCmdBindIndexBuffer(commandBuffer, models[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &models[i]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
-
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(models[i]->indices.size()), 1, 0, 0, 0);
+        model->RecordCommandBuffer(commandBuffer);
     }
 
     vkCmdEndRenderPass(commandBuffer);
