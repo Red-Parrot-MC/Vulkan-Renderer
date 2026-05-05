@@ -16,6 +16,25 @@ Texture::Texture(const char* filename)
     CreateTextureImage(filename);
     CreateTextureImageView();
     CreateTextureSampler();
+
+    VkDebugUtilsObjectNameInfoEXT nameInfo{};
+    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+    nameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
+    nameInfo.objectHandle = (uint64_t)textureImage;
+    nameInfo.pObjectName = filename;
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
+    nameInfo.objectHandle = (uint64_t)textureImageView;
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
+    nameInfo.objectHandle = (uint64_t)textureImageMemory;
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_SAMPLER;
+    nameInfo.objectHandle = (uint64_t)textureSampler;
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 }
 
 Texture::~Texture()

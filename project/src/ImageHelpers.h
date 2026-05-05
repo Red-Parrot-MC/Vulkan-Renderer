@@ -165,4 +165,31 @@ public:
         return imageView;
     }
 
+    static Image* createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageAspectFlags aspectFlags)
+    {
+        Image* image = new Image();
+        createImage(width, height, mipLevels, format, tiling, usage, properties, image->image, image->memory);
+        image->view = createImageView(image->image, format, aspectFlags, mipLevels);
+        return image;
+    }
+
+    static gBuffer* createGBuffer(VkFormat format, VkClearValue clearValue)
+    {
+        gBuffer* buffer = new gBuffer();
+        buffer->format = format;
+        buffer->clearValue = clearValue;
+        buffer->sampleCount = VK_SAMPLE_COUNT_1_BIT;
+        buffer->image = *ImageHelpers::createImage(
+            CONTEXT->swapChainExtent.width,
+            CONTEXT->swapChainExtent.height,
+            1,
+            format,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT
+        );
+
+        return buffer;
+    }
 };

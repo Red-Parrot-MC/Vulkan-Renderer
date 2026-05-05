@@ -5,6 +5,7 @@
 #include "structs.h"
 #include "VmaUsage.h"
 
+
 class VulkanContext
 {
 public:
@@ -57,12 +58,17 @@ public:
     VkImageView depthImageView{};
 
     const int MAX_FRAMES_IN_FLIGHT{ 3 };
+
+    std::vector<gBuffer*> gBuffers{};
 };
 
 class CurrentVulkanContext
 {
 public:
     static VulkanContext* context;
+    static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
 };
 
 #define CONTEXT CurrentVulkanContext::context
+#define setDebugUtilsObjectName if (CurrentVulkanContext::vkSetDebugUtilsObjectNameEXT) CurrentVulkanContext::vkSetDebugUtilsObjectNameEXT
+#define vkSetDebugUtilsObjectName CurrentVulkanContext::vkSetDebugUtilsObjectNameEXT

@@ -19,6 +19,7 @@ private:
     static void createLogicalDevice();
     static void initializeVMA();
     static void createSwapChain();
+    static void createGBuffers();
     static void createImageViews();
     static void createRenderPass();
     static void createDescriptorSetLayout();
@@ -27,11 +28,10 @@ private:
     static void createDepthResources();
     static void createFramebuffers();
     static void createUniformBuffers();
-    static void createDescriptorPool();
     static void createCommandBuffers();
     static void createSyncObjects();
-    static void createVertexBuffer();
-    static void createIndexBuffer();
+    static void createDescriptorPool();
+    static void createDebugNameInfo();
 
 
     static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);

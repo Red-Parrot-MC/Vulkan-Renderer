@@ -105,3 +105,18 @@ struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;
 };
+
+struct Image
+{
+    VkImage image{};
+    VkDeviceMemory memory{};
+    VkImageView view{};
+};
+
+struct gBuffer
+{
+    Image image{};
+    VkClearValue clearValue{};
+    VkFormat format{};
+    VkSampleCountFlagBits sampleCount{};
+};

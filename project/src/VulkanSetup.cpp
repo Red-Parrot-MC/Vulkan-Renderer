@@ -17,7 +17,7 @@ const std::vector<const char*> validationLayers = {
 };
 
 const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 };
 
 #ifdef NDEBUG
@@ -35,6 +35,7 @@ void VulkanSetup::InitializeVulkan()
     createLogicalDevice();
     initializeVMA();
     createSwapChain();
+    createGBuffers();
     createImageViews();
     createRenderPass();
     createDescriptorSetLayout();
@@ -46,6 +47,11 @@ void VulkanSetup::InitializeVulkan()
     createCommandBuffers();
     createSyncObjects();
     createDescriptorPool();
+
+    vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(CONTEXT->device, "vkSetDebugUtilsObjectNameEXT");
+
+    if (vkSetDebugUtilsObjectName)
+        createDebugNameInfo();
 }
 
 void VulkanSetup::recreateSwapChain() {
@@ -65,6 +71,7 @@ void VulkanSetup::recreateSwapChain() {
     cleanupSwapChain();
 
     createSwapChain();
+    createGBuffers();
     createImageViews();
     createDepthResources();
     createFramebuffers();
@@ -79,6 +86,15 @@ void VulkanSetup::recreateSwapChain() {
 }
 
 void VulkanSetup::cleanupSwapChain() {
+    for (gBuffer* b : CONTEXT->gBuffers)
+    {
+        vkDestroyImageView(CONTEXT->device, b->image.view, nullptr);
+
+        vkDestroyImage(CONTEXT->device, b->image.image, nullptr);
+        vkFreeMemory(CONTEXT->device, b->image.memory, nullptr);
+    }
+    CONTEXT->gBuffers.clear();
+
     vkDestroyImageView(CONTEXT->device, CONTEXT->depthImageView, nullptr);
     vkDestroyImage(CONTEXT->device, CONTEXT->depthImage, nullptr);
     vkFreeMemory(CONTEXT->device, CONTEXT->depthImageMemory, nullptr);
@@ -290,6 +306,35 @@ void VulkanSetup::initializeVMA()
     {
         throw std::runtime_error("failed to create vma pool!");
     }
+
+    //VkImageCreateInfo imageInfo{};
+    //imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    //imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    //imageInfo.extent.width = 128;
+    //imageInfo.extent.height = 128;
+    //imageInfo.extent.depth = 1;
+    //imageInfo.mipLevels = 1;
+    //imageInfo.arrayLayers = 1;
+    //imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    //imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    //imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    //imageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    //imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    //imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    //VmaAllocationCreateInfo allocInfo{};
+    //allocInfo.pool = CONTEXT->vmaPool;
+
+    //VmaAllocationInfo vmaAllocationInfo{};
+
+    //VkResult result = vmaCreateImage(CONTEXT->vmaAllocator, &imageInfo, &allocInfo, &CONTEXT->image, &CONTEXT->vmaAllocation, &vmaAllocationInfo);
+    //if (result != VK_SUCCESS)
+    //{
+    //    std::cout << string_VkResult(result) << "\n";
+    //    throw std::runtime_error("failed to create image using vma! ");
+    //}
+
+    //vmaDestroyImage(CONTEXT->vmaAllocator, CONTEXT->image, CONTEXT->vmaAllocation);
 }
 
 void VulkanSetup::createSwapChain() {
@@ -346,6 +391,18 @@ void VulkanSetup::createSwapChain() {
     CONTEXT->swapChainExtent = extent;
 }
 
+void VulkanSetup::createGBuffers()
+{
+    VkClearValue clearValue{};
+    clearValue.color = { 0, 0, 0, 1 };
+
+    // albedo
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_SRGB, clearValue));
+
+    // normals
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue));
+}
+
 void VulkanSetup::createImageViews() {
     CONTEXT->swapChainImageViews.resize(CONTEXT->swapChainImages.size());
 
@@ -354,7 +411,9 @@ void VulkanSetup::createImageViews() {
     }
 }
 
-void VulkanSetup::createRenderPass() {
+void VulkanSetup::createRenderPass()
+{
+    // Attachments
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = CONTEXT->swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -364,10 +423,6 @@ void VulkanSetup::createRenderPass() {
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format = findDepthFormat();
@@ -379,16 +434,66 @@ void VulkanSetup::createRenderPass() {
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    std::vector<VkAttachmentDescription> attachments = {
+        colorAttachment,
+        depthAttachment,
+    };
+
+    for (gBuffer* b : CONTEXT->gBuffers)
+    {
+        VkAttachmentDescription bufferAttachment{};
+        bufferAttachment.format = b->format;
+        bufferAttachment.samples = b->sampleCount;
+        bufferAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        bufferAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        bufferAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        bufferAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        bufferAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        bufferAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        attachments.push_back(bufferAttachment);
+    }
+
+    // references
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentReference depthAttachmentRef{};
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    std::vector<VkAttachmentReference> references
+    {
+        colorAttachmentRef
+    };
+
+    uint32_t attachmentIndex = references.size();
+
+    for (gBuffer* b : CONTEXT->gBuffers)
+    {
+        attachmentIndex++;
+
+        VkAttachmentReference bufferReference{};
+        bufferReference.attachment = attachmentIndex;
+        bufferReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        references.push_back(bufferReference);
+    }
+
+    // subpasses
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.colorAttachmentCount = references.size();
+    subpass.pColorAttachments = references.data();
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
+    std::vector<VkSubpassDescription> subpasses
+    {
+        subpass,
+    };
+
+    // dependency
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -397,13 +502,13 @@ void VulkanSetup::createRenderPass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+    // render pass info
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
     renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.subpassCount = subpasses.size();
+    renderPassInfo.pSubpasses = subpasses.data();
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
@@ -427,7 +532,7 @@ void VulkanSetup::createDescriptorSetLayout() {
     samplerLayoutBinding.pImmutableSamplers = nullptr;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding};
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -511,12 +616,22 @@ void VulkanSetup::createGraphicsPipeline() {
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
 
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments
+    {
+        colorBlendAttachment,
+    };
+
+    for (gBuffer* b : CONTEXT->gBuffers)
+    {
+        colorBlendAttachments.push_back(colorBlendAttachment);
+    }
+
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = colorBlendAttachments.size();
+    colorBlending.pAttachments = colorBlendAttachments.data();
     colorBlending.blendConstants[0] = 0.0f; // Optional
     colorBlending.blendConstants[1] = 0.0f; // Optional
     colorBlending.blendConstants[2] = 0.0f; // Optional
@@ -603,10 +718,15 @@ void VulkanSetup::createFramebuffers() {
     CONTEXT->swapChainFramebuffers.resize(CONTEXT->swapChainImageViews.size());
 
     for (size_t i = 0; i < CONTEXT->swapChainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
+        std::vector<VkImageView> attachments = {
             CONTEXT->swapChainImageViews[i],
-            CONTEXT->depthImageView
+            CONTEXT->depthImageView,
         };
+
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            attachments.push_back(b->image.view);
+        }
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -634,24 +754,6 @@ void VulkanSetup::createUniformBuffers() {
         BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->uniformBuffers[i], CONTEXT->uniformBuffersMemory[i]);
 
         vkMapMemory(CONTEXT->device, CONTEXT->uniformBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->uniformBuffersMapped[i]);
-    }
-}
-
-void VulkanSetup::createDescriptorPool() {
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
-
-    if (vkCreateDescriptorPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
@@ -689,6 +791,64 @@ void VulkanSetup::createSyncObjects() {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     }
+}
+
+void VulkanSetup::createDescriptorPool() {
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+
+    if (vkCreateDescriptorPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor pool!");
+    }
+}
+
+void VulkanSetup::createDebugNameInfo()
+{
+    VkDebugUtilsObjectNameInfoEXT nameInfo{};
+    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+    nameInfo.objectType = VK_OBJECT_TYPE_DEVICE;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->device;
+    nameInfo.pObjectName = "Device (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_INSTANCE;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->instance;
+    nameInfo.pObjectName = "Instance (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_PHYSICAL_DEVICE;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->physicalDevice;
+    nameInfo.pObjectName = "Physical Device (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->graphicsPipeline;
+    nameInfo.pObjectName = "Pipeline (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_QUEUE;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->graphicsQueue;
+    nameInfo.pObjectName = "Graphics Queue (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->pipelineLayout;
+    nameInfo.pObjectName = "Pipeline Layout (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
+    nameInfo.objectHandle = (uint64_t)CONTEXT->renderPass;
+    nameInfo.pObjectName = "Render Pass (default)";
+    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 }
 
 
