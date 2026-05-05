@@ -1,5 +1,8 @@
 # Create the executable
 add_executable(${PROJECT_NAME} 
+    "src/libs/vk_mem_alloc.h"
+    "src/libs/VmaUsage.cpp"
+    
     "src/main.cpp"
     "src/VulkanContext.h"
     "src/BufferHelpers.h"
@@ -16,7 +19,8 @@ add_executable(${PROJECT_NAME}
     "src/Model.cpp"
     "src/DescriptorSetBuilder.h" 
     "src/Camera.h"
- "src/Application.h" "src/Application.cpp")
+    "src/Application.h" 
+    "src/Application.cpp" "src/VmaUsage.h")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

@@ -301,19 +301,6 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
     scissor.extent = CONTEXT->swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    //for (size_t i = 0; i < models.size(); i++)
-    //{
-    //    VkBuffer vertexBuffers[] = { models[i]->vertexBuffer };
-    //    VkDeviceSize offsets[] = { 0 };
-    //    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-    //    vkCmdBindIndexBuffer(commandBuffer, models[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-    //    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &models[i]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
-
-    //    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(models[i]->indices.size()), 1, 0, 0, 0);
-    //}
-
     for (Model* model : models)
     {
         model->RecordCommandBuffer(commandBuffer);

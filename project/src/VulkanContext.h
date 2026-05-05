@@ -3,6 +3,7 @@
 #include <glm/ext/vector_float3.hpp>
 #include <array>
 #include "structs.h"
+#include "VmaUsage.h"
 
 class VulkanContext
 {
@@ -15,6 +16,9 @@ public:
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device{};
+
+    VmaAllocator vmaAllocator{};
+    VmaPool vmaPool{};
 
     VkQueue graphicsQueue{};
     VkQueue presentQueue{};

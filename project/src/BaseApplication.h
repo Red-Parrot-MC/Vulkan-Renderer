@@ -36,6 +36,8 @@ protected:
     Camera camera{};
 
 private:
+    std::chrono::microseconds totalMicroseconds{};
+
     virtual void Initialize() {}
     virtual void Update(float deltaTime) {}
     virtual void Cleanup() {}
@@ -79,11 +81,12 @@ private:
             fpsFrameCount++;
             if (clock() - fpsTimerStart >= CLOCKS_PER_SEC) {
                 // Add FPS to window title
-                title = WINDOW_NAME + " - FPS: " + std::to_string(fpsFrameCount);
+                title = WINDOW_NAME + " - FPS: " + std::to_string(fpsFrameCount) + " - Recording command buffer: " + std::to_string(totalMicroseconds.count() / fpsFrameCount) + " us - " + std::to_string(totalMicroseconds.count() / 10000) + "%";
                 glfwSetWindowTitle(CONTEXT->window, title.c_str());
 
                 fpsFrameCount = 0;
                 fpsTimerStart = clock();
+                totalMicroseconds = std::chrono::microseconds::zero();
             }
         }
 
@@ -122,8 +125,13 @@ private:
         vkResetFences(CONTEXT->device, 1, &CONTEXT->inFlightFences[CONTEXT->currentFrame]);
 
         vkResetCommandBuffer(CONTEXT->commandBuffers[CONTEXT->currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-        //recordCommandBuffer(CONTEXT->commandBuffers[CONTEXT->currentFrame], imageIndex);
+
+        auto start = std::chrono::high_resolution_clock::now();
         scene->RecordCommandBuffer(CONTEXT->commandBuffers[CONTEXT->currentFrame], imageIndex);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        totalMicroseconds += microseconds;
+        //std::cout << "Recording command buffer time: " << microseconds << '\n';
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -167,64 +175,6 @@ private:
         }
 
         CONTEXT->currentFrame = (CONTEXT->currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
-        //VkCommandBufferBeginInfo beginInfo{};
-        //beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-        //if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        //    throw std::runtime_error("failed to begin recording command buffer!");
-        //}
-
-        //VkRenderPassBeginInfo renderPassInfo{};
-        //renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        //renderPassInfo.renderPass = CONTEXT->renderPass;
-        //renderPassInfo.framebuffer = CONTEXT->swapChainFramebuffers[imageIndex];
-        //renderPassInfo.renderArea.offset = { 0, 0 };
-        //renderPassInfo.renderArea.extent = CONTEXT->swapChainExtent;
-
-        //std::array<VkClearValue, 2> clearValues{};
-        //clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-        //clearValues[1].depthStencil = { 1.0f, 0 };
-
-        //renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        //renderPassInfo.pClearValues = clearValues.data();
-
-        //vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        //vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
-
-        //VkViewport viewport{};
-        //viewport.x = 0.0f;
-        //viewport.y = 0.0f;
-        //viewport.width = (float)CONTEXT->swapChainExtent.width;
-        //viewport.height = (float)CONTEXT->swapChainExtent.height;
-        //viewport.minDepth = 0.0f;
-        //viewport.maxDepth = 1.0f;
-        //vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-        //VkRect2D scissor{};
-        //scissor.offset = { 0, 0 };
-        //scissor.extent = CONTEXT->swapChainExtent;
-        //vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-        //VkBuffer vertexBuffers[] = { CONTEXT->vertexBuffer };
-        //VkDeviceSize offsets[] = { 0 };
-        //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-        //vkCmdBindIndexBuffer(commandBuffer, CONTEXT->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-
-        //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &CONTEXT->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
-
-        //vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(CONTEXT->indices.size()), 1, 0, 0, 0);
-
-        //vkCmdEndRenderPass(commandBuffer);
-
-        //if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        //    throw std::runtime_error("failed to record command buffer!");
-        //}
-
     }
 
     void updateUniformBuffer(uint32_t currentImage) {

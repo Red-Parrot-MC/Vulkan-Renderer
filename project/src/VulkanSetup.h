@@ -17,6 +17,7 @@ private:
     static void createSurface();
     static void pickPhysicalDevice();
     static void createLogicalDevice();
+    static void initializeVMA();
     static void createSwapChain();
     static void createImageViews();
     static void createRenderPass();

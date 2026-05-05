@@ -7,6 +7,7 @@
 #include <fstream>
 #include "ImageHelpers.h"
 #include "DescriptorSetBuilder.h"
+#include <vulkan/vk_enum_string_helper.h>
 
 const int MAX_FRAMES_IN_FLIGHT = 3;
 const int MAX_MODELS = 200;
@@ -32,6 +33,7 @@ void VulkanSetup::InitializeVulkan()
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+    initializeVMA();
     createSwapChain();
     createImageViews();
     createRenderPass();
@@ -102,6 +104,9 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 void VulkanSetup::cleanup()
 {
     cleanupSwapChain();
+
+    vmaDestroyPool(CONTEXT->vmaAllocator, CONTEXT->vmaPool);
+    vmaDestroyAllocator(CONTEXT->vmaAllocator);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
@@ -266,6 +271,25 @@ void VulkanSetup::createLogicalDevice() {
 
     vkGetDeviceQueue(CONTEXT->device, indices.graphicsFamily.value(), 0, &CONTEXT->graphicsQueue);
     vkGetDeviceQueue(CONTEXT->device, indices.presentFamily.value(), 0, &CONTEXT->presentQueue);
+}
+
+void VulkanSetup::initializeVMA()
+{
+    VmaAllocatorCreateInfo allocatorInfo{};
+    allocatorInfo.device = CONTEXT->device;
+    allocatorInfo.instance = CONTEXT->instance;
+    allocatorInfo.physicalDevice = CONTEXT->physicalDevice;
+    if (vmaCreateAllocator(&allocatorInfo, &CONTEXT->vmaAllocator) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create vma allocator!");
+    }
+
+    VmaPoolCreateInfo poolInfo{};
+
+    if (vmaCreatePool(CONTEXT->vmaAllocator, &poolInfo, &CONTEXT->vmaPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create vma pool!");
+    }
 }
 
 void VulkanSetup::createSwapChain() {
