@@ -104,6 +104,9 @@ bool Scene::LoadOBJ(std::string filename)
 
 bool Scene::LoadGLTF(std::string filename)
 {
+    clock_t startTime = clock();
+    std::cout << "\nLoading Scene: " << filename << "\n";
+
 	tinygltf3::Model gltfModel{};
 	tinygltf3::ErrorStack errorStack{};
 
@@ -126,37 +129,34 @@ bool Scene::LoadGLTF(std::string filename)
             filename[i] = '/';
 
     std::string baseUri = filename.substr(0, filename.find_last_of('/')) + '/';
-    std::cout << "BaseUri: " << baseUri << '\n';
-
-    std::cout << tg3Model->accessors_count << std::endl;
-    std::cout << tg3Model->buffers_count << std::endl;
-    std::cout << tg3Model->buffer_views_count << std::endl;
-    std::cout << tg3Model->materials_count << std::endl;
-    std::cout << tg3Model->meshes_count << std::endl;
-    std::cout << tg3Model->nodes_count << std::endl;
-    std::cout << tg3Model->textures_count << std::endl;
 
     Model* model = new Model{};
     std::unordered_map<uint32_t, uint32_t> loadedMaterials{};
 
-    std::cout << std::endl;
+    uint32_t primitivesCount{ 0 };
+    uint32_t primitivesLoaded{ 0 };
+
+    for (uint32_t meshIndex = 0; meshIndex < tg3Model->meshes_count; meshIndex++)
+    {
+        tg3_mesh mesh = tg3Model->meshes[meshIndex];
+        primitivesCount += mesh.primitives_count;
+    }
 
     for (uint32_t meshIndex = 0; meshIndex < tg3Model->meshes_count; meshIndex++)
     {
         tg3_mesh mesh = tg3Model->meshes[meshIndex];
 
-        for (uint32_t primitiveIndex = 0; primitiveIndex < tg3Model->meshes->primitives_count; primitiveIndex++)
+        for (uint32_t primitiveIndex = 0; primitiveIndex < mesh.primitives_count; primitiveIndex++)
         {
+            primitivesLoaded++;
+            std::cout << "\r\033[K" << float(primitivesLoaded) / primitivesCount * 100 << "%";
+
             tg3_primitive tg3Primitive = mesh.primitives[primitiveIndex];
             tg3_accessor accessor = tg3Model->accessors[tg3Primitive.indices];
             tg3_buffer_view view = tg3Model->buffer_views[accessor.buffer_view];
             tg3_buffer buffer = tg3Model->buffers[view.buffer];
             const uint8_t* data = buffer.data.data + view.byte_offset + accessor.byte_offset;
             size_t count = buffer.data.count;
-
-            std::cout << "Primitive: " << primitiveIndex << " Accessor: " << tg3Primitive.indices << " View: " << accessor.buffer_view << " Buffer: " << view.buffer << " Buffer size: " << buffer.data.count << std::endl;
-            std::cout << "Accessor.count: " << accessor.count << " Accessor byte offset: " << accessor.byte_offset << " View byte offset: " << view.byte_offset << "\n";
-            std::cout << "Component type: " << accessor.component_type << '\n';
 
             Primitive* primitive = new Primitive();
             model->primitives.push_back(primitive);
@@ -180,7 +180,6 @@ bool Scene::LoadGLTF(std::string filename)
                 break;
             }
 
-            std::cout << std::endl;
             std::vector<glm::vec3> positions{};
             std::vector<glm::vec3> normals{};
             std::vector<glm::vec4> tangents{};
@@ -194,8 +193,6 @@ bool Scene::LoadGLTF(std::string filename)
                 view = tg3Model->buffer_views[accessor.buffer_view];
                 buffer = tg3Model->buffers[view.buffer];
                 data = buffer.data.data + view.byte_offset + accessor.byte_offset;
-
-                std::cout << attribute.key.data << ", " << accessor.component_type << ", " << accessor.type << '\n';
 
                 if (key == "POSITION")
                 {
@@ -235,22 +232,6 @@ bool Scene::LoadGLTF(std::string filename)
 
                 primitive->vertices.push_back(vertex);
             }
-
-            //tg3_material material = tg3Model->materials[tg3Primitive.material];
-            //tg3_texture_info textureInfo = material.pbr_metallic_roughness.base_color_texture;
-            //tg3_image image = tg3Model->images[tg3Model->textures[textureInfo.index].source];
-
-            //// prevent textures from loading more than once
-            //uint32_t materialIndex = loadedMaterials[image.uri.data];
-            //if (materialIndex == 0)
-            //{
-            //    Texture* albedo = new Texture(std::string(baseUri + image.uri.data).c_str());
-            //    model->materials.push_back(new Material{ albedo });
-            //    materialIndex = model->materials.size();
-            //    loadedMaterials[image.uri.data] = materialIndex;
-            //}
-
-            //primitive->materialIndex = materialIndex - 1;
 
             uint32_t materialIndex = loadedMaterials[tg3Primitive.material];
             if (materialIndex == 0)
@@ -292,6 +273,9 @@ bool Scene::LoadGLTF(std::string filename)
 
     model->Initialize();
     models.push_back(model);
+
+    clock_t endTime = clock();
+    std::cout << "\nLoading time: " << (endTime - startTime) / float(CLOCKS_PER_SEC) << "s\n";
 
 	return true;
 }
