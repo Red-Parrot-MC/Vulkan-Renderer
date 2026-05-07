@@ -5,7 +5,7 @@
 class Texture
 {
 public:
-	Texture(const char* filename);
+	Texture(const char* filename, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
 	~Texture();
 
 	uint32_t mipLevels;
@@ -13,11 +13,12 @@ public:
 	VkDeviceMemory textureImageMemory{};
 	VkImageView textureImageView{};
 	VkSampler textureSampler{};
+	VkFormat format{};
 
 private:
 	void CreateTextureImage(const char* filename);
 	void CreateTextureImageView();
 	void CreateTextureSampler();
 	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-
+	void CreateDebugNameInfo(const char* name);
 };

@@ -26,18 +26,17 @@ public:
 		initWindow();
 		initVulkan();
         Initialize();
+        RecordCommandBuffers();
 		mainLoop();
         Cleanup();
 		cleanupVulkan();
 	}
 
 protected:
-    Scene* scene;
+    Scene* scene{};
     Camera camera{};
 
 private:
-    std::chrono::microseconds totalMicroseconds{};
-
     virtual void Initialize() {}
     virtual void Update(float deltaTime) {}
     virtual void Cleanup() {}
@@ -81,12 +80,11 @@ private:
             fpsFrameCount++;
             if (clock() - fpsTimerStart >= CLOCKS_PER_SEC) {
                 // Add FPS to window title
-                title = WINDOW_NAME + " - FPS: " + std::to_string(fpsFrameCount) + " - Recording command buffer: " + std::to_string(totalMicroseconds.count() / fpsFrameCount) + " us - " + std::to_string(totalMicroseconds.count() / 10000) + "%";
+                title = WINDOW_NAME + " - FPS: " + std::to_string(fpsFrameCount);
                 glfwSetWindowTitle(CONTEXT->window, title.c_str());
 
                 fpsFrameCount = 0;
                 fpsTimerStart = clock();
-                totalMicroseconds = std::chrono::microseconds::zero();
             }
         }
 
@@ -109,10 +107,12 @@ private:
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(CONTEXT->device, CONTEXT->swapChain, UINT64_MAX, CONTEXT->imageAvailableSemaphores[CONTEXT->currentFrame], VK_NULL_HANDLE, &imageIndex);
+        //std::cout << CONTEXT->currentFrame << ", " << imageIndex << "\n";
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || CONTEXT->framebufferResized) {
             CONTEXT->framebufferResized = false;
             VulkanSetup::recreateSwapChain();
+            RecordCommandBuffers();
             return;
         }
         else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -123,15 +123,6 @@ private:
 
         // Only reset the fence if we are submitting work
         vkResetFences(CONTEXT->device, 1, &CONTEXT->inFlightFences[CONTEXT->currentFrame]);
-
-        vkResetCommandBuffer(CONTEXT->commandBuffers[CONTEXT->currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-
-        auto start = std::chrono::high_resolution_clock::now();
-        scene->RecordCommandBuffer(CONTEXT->commandBuffers[CONTEXT->currentFrame], imageIndex);
-        auto end = std::chrono::high_resolution_clock::now();
-        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        totalMicroseconds += microseconds;
-        //std::cout << "Recording command buffer time: " << microseconds << '\n';
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -169,12 +160,34 @@ private:
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             VulkanSetup::recreateSwapChain();
+            RecordCommandBuffers();
         }
         else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
         }
 
         CONTEXT->currentFrame = (CONTEXT->currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void RecordCommandBuffers()
+    {
+        for (uint32_t imageIndex = 0; imageIndex < CONTEXT->MAX_FRAMES_IN_FLIGHT; imageIndex++)
+        {
+            RecordCommandBuffer(imageIndex);
+        }
+    }
+
+    void RecordCommandBuffer(uint32_t imageIndex)
+    {
+        VkCommandBuffer& commandBuffer = CONTEXT->commandBuffers[imageIndex];
+        vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
+
+        scene->RecordCommandBuffer(commandBuffer, imageIndex);
+
+        vkCmdEndRenderPass(commandBuffer);
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
     }
 
     void updateUniformBuffer(uint32_t currentImage) {

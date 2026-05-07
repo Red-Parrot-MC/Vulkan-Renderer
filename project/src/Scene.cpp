@@ -137,7 +137,7 @@ bool Scene::LoadGLTF(std::string filename)
     std::cout << tg3Model->textures_count << std::endl;
 
     Model* model = new Model{};
-    std::unordered_map<const char*, uint32_t> loadedMaterials{};
+    std::unordered_map<uint32_t, uint32_t> loadedMaterials{};
 
     std::cout << std::endl;
 
@@ -236,18 +236,54 @@ bool Scene::LoadGLTF(std::string filename)
                 primitive->vertices.push_back(vertex);
             }
 
-            tg3_material material = tg3Model->materials[tg3Primitive.material];
-            tg3_texture_info textureInfo = material.pbr_metallic_roughness.base_color_texture;
-            tg3_image image = tg3Model->images[tg3Model->textures[textureInfo.index].source];
+            //tg3_material material = tg3Model->materials[tg3Primitive.material];
+            //tg3_texture_info textureInfo = material.pbr_metallic_roughness.base_color_texture;
+            //tg3_image image = tg3Model->images[tg3Model->textures[textureInfo.index].source];
 
-            // prevent textures from loading more than once
-            uint32_t materialIndex = loadedMaterials[image.uri.data];
+            //// prevent textures from loading more than once
+            //uint32_t materialIndex = loadedMaterials[image.uri.data];
+            //if (materialIndex == 0)
+            //{
+            //    Texture* albedo = new Texture(std::string(baseUri + image.uri.data).c_str());
+            //    model->materials.push_back(new Material{ albedo });
+            //    materialIndex = model->materials.size();
+            //    loadedMaterials[image.uri.data] = materialIndex;
+            //}
+
+            //primitive->materialIndex = materialIndex - 1;
+
+            uint32_t materialIndex = loadedMaterials[tg3Primitive.material];
             if (materialIndex == 0)
             {
-                Texture* texture = new Texture(std::string(baseUri + image.uri.data).c_str());
-                model->materials.push_back(new Material{ texture });
+                tg3_material material = tg3Model->materials[tg3Primitive.material];
+
+                Texture* albedo{}, * normal{}, * metallicRoughness{};
+
+                tg3_texture_info baseColorInfo = material.pbr_metallic_roughness.base_color_texture;
+                if (baseColorInfo.index > -1)
+                {
+                    tg3_image baseColorImage = tg3Model->images[tg3Model->textures[baseColorInfo.index].source];
+                    albedo = new Texture(std::string(baseUri + baseColorImage.uri.data).c_str());
+                }
+
+                tg3_normal_texture_info normalInfo = material.normal_texture;
+                if (normalInfo.index > -1)
+                {
+                    tg3_image normalImage = tg3Model->images[tg3Model->textures[normalInfo.index].source];
+                    normal = new Texture(std::string(baseUri + normalImage.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                }
+
+                tg3_texture_info metallicRoughnessInfo = material.pbr_metallic_roughness.metallic_roughness_texture;
+                if (metallicRoughnessInfo.index > -1)
+                {
+                    tg3_image metallicRoughnessImage = tg3Model->images[tg3Model->textures[metallicRoughnessInfo.index].source];
+                    metallicRoughness = new Texture(std::string(baseUri + metallicRoughnessImage.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                }
+
+                model->materials.push_back(new Material{ albedo, normal, metallicRoughness });
                 materialIndex = model->materials.size();
-                loadedMaterials[image.uri.data] = materialIndex;
+
+                loadedMaterials[tg3Primitive.material] = materialIndex;
             }
 
             primitive->materialIndex = materialIndex - 1;
@@ -310,11 +346,5 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
     for (Model* model : models)
     {
         model->RecordCommandBuffer(commandBuffer);
-    }
-
-    vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
     }
 }

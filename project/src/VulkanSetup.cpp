@@ -83,6 +83,9 @@ void VulkanSetup::recreateSwapChain() {
     }
 
     createSyncObjects();
+
+    CONTEXT->currentFrame = 0;
+    vkDeviceWaitIdle(CONTEXT->device);
 }
 
 void VulkanSetup::cleanupSwapChain() {
@@ -401,6 +404,9 @@ void VulkanSetup::createGBuffers()
 
     // normals
     CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue));
+
+    // metalic roughness
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_UNORM, clearValue));
 }
 
 void VulkanSetup::createImageViews() {
@@ -487,6 +493,12 @@ void VulkanSetup::createRenderPass()
     subpass.colorAttachmentCount = references.size();
     subpass.pColorAttachments = references.data();
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+    VkSubpassDescription subpass2{};
+    subpass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass2.colorAttachmentCount = references.size();
+    subpass2.pColorAttachments = references.data();
+    subpass2.pDepthStencilAttachment = &depthAttachmentRef;
 
     std::vector<VkSubpassDescription> subpasses
     {
@@ -867,7 +879,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanSetup::debugCallback(VkDebugUtilsMessageSev
 
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
     {
-        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl << std::endl;
     }
 
     return VK_FALSE;

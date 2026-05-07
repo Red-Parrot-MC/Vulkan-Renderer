@@ -19,6 +19,7 @@ void main() {
     outNormal = Encode(fragNormal);
     if (outAlbedo.a < 0.5) discard;
     outColor = outAlbedo;
+    //outColor = vec4(outNormal, 0, 1);
 }
 
 vec2 Encode(vec3 n) // Octahedron normal vector encoding

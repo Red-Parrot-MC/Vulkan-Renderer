@@ -134,4 +134,5 @@ Model::~Model()
         delete m;
 
     primitives.clear();
+    materials.clear();
 }
