@@ -55,8 +55,9 @@ set(SHADER_COMPILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 file(GLOB_RECURSE SHADER_SOURCE_FILES
     "${SHADER_COMPILE_DIR}/*.vert"
     "${SHADER_COMPILE_DIR}/*.frag"
+    "${SHADER_COMPILE_DIR}/*.comp"
 )
-set(SHADER_COMPILE_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
+set(SHADER_COMPILE_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled/")
 file(MAKE_DIRECTORY ${SHADER_COMPILE_OUT_DIR})
 foreach(SHADER ${SHADER_SOURCE_FILES})
     get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
@@ -65,13 +66,15 @@ foreach(SHADER ${SHADER_SOURCE_FILES})
         set(SHADER_STAGE "vert")
     elseif(SHADER_EXT STREQUAL ".frag")
         set(SHADER_STAGE "frag")
+    elseif(SHADER_EXT STREQUAL ".comp")
+        set(SHADER_STAGE "comp")
     endif()
 
     message(STATUS "Compiling shader: ${SHADER} (stage: ${SHADER_STAGE})")
 
     add_custom_command(
         TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND C:/VulkanSDK/1.4.341.1/Bin/glslc.exe ${SHADER} -o "${SHADER_COMPILE_OUT_DIR}/${SHADER_NAME}_${SHADER_STAGE}.spv"
+        COMMAND  glslangValidator -V -g ${SHADER} -o "${SHADER_COMPILE_OUT_DIR}/${SHADER_NAME}_${SHADER_STAGE}.spv"
     )
 endforeach(SHADER)
 
