@@ -43,6 +43,8 @@ public:
     std::vector<VkSemaphore> renderFinishedSemaphores{};
     std::vector<VkFence> inFlightFences{};
 
+    std::vector<VkSubmitInfo2> drawFrameSubmitInfos{};
+
     uint32_t currentFrame = 0;
     bool framebufferResized = false;
 

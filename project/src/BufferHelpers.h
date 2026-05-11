@@ -1,6 +1,5 @@
 #pragma once
 #include "VulkanContext.h"
-#include <stdexcept>
 
 class BufferHelpers
 {
@@ -27,12 +26,16 @@ public:
     static void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
         vkEndCommandBuffer(commandBuffer);
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = commandBuffer;
 
-        vkQueueSubmit(CONTEXT->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.pCommandBufferInfos = &commandBufferInfo;
+        submitInfo.commandBufferInfoCount = 1;
+
+        vkQueueSubmit2(CONTEXT->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
         vkQueueWaitIdle(CONTEXT->graphicsQueue);
 
         vkFreeCommandBuffers(CONTEXT->device, CONTEXT->commandPool, 1, &commandBuffer);

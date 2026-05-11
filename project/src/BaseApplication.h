@@ -27,6 +27,7 @@ public:
 		initVulkan();
         Initialize();
         RecordCommandBuffers();
+        CreateSubmitInfos();
 		mainLoop();
         Cleanup();
 		cleanupVulkan();
@@ -94,6 +95,7 @@ private:
 	void cleanupVulkan()
 	{
         delete scene;
+        DestroySubmitInfos();
         VulkanSetup::cleanup();
 	}
 
@@ -113,6 +115,7 @@ private:
             CONTEXT->framebufferResized = false;
             VulkanSetup::recreateSwapChain();
             RecordCommandBuffers();
+            CreateSubmitInfos();
             return;
         }
         else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -124,25 +127,11 @@ private:
         // Only reset the fence if we are submitting work
         vkResetFences(CONTEXT->device, 1, &CONTEXT->inFlightFences[CONTEXT->currentFrame]);
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-        VkSemaphore waitSemaphores[] = { CONTEXT->imageAvailableSemaphores[CONTEXT->currentFrame] };
-        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
-
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &CONTEXT->commandBuffers[CONTEXT->currentFrame];
-
-        VkSemaphore signalSemaphores[] = { CONTEXT->renderFinishedSemaphores[CONTEXT->currentFrame] };
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        if (vkQueueSubmit(CONTEXT->graphicsQueue, 1, &submitInfo, CONTEXT->inFlightFences[CONTEXT->currentFrame]) != VK_SUCCESS) {
+        if (vkQueueSubmit2(CONTEXT->graphicsQueue, 1, &CONTEXT->drawFrameSubmitInfos[CONTEXT->currentFrame], CONTEXT->inFlightFences[CONTEXT->currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
+
+        VkSemaphore signalSemaphores[] = { CONTEXT->renderFinishedSemaphores[CONTEXT->currentFrame] };
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -161,6 +150,7 @@ private:
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             VulkanSetup::recreateSwapChain();
             RecordCommandBuffers();
+            CreateSubmitInfos();
         }
         else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
@@ -187,6 +177,60 @@ private:
         vkCmdEndRenderPass(commandBuffer);
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+
+    void CreateSubmitInfos()
+    {
+        DestroySubmitInfos();
+        CONTEXT->drawFrameSubmitInfos.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+
+        for (uint32_t index = 0; index < CONTEXT->MAX_FRAMES_IN_FLIGHT; index++)
+        {
+            VkSemaphoreSubmitInfo* waitSemaphoreInfo = new VkSemaphoreSubmitInfo{};
+            waitSemaphoreInfo->sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitSemaphoreInfo->semaphore = CONTEXT->imageAvailableSemaphores[index];
+            waitSemaphoreInfo->value = 0;
+            waitSemaphoreInfo->stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            waitSemaphoreInfo->deviceIndex = 0;
+
+            VkSemaphoreSubmitInfo* signalSemaphoreInfo = new VkSemaphoreSubmitInfo{};
+            signalSemaphoreInfo->sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalSemaphoreInfo->semaphore = CONTEXT->renderFinishedSemaphores[index];
+            signalSemaphoreInfo->value = 0;
+            signalSemaphoreInfo->stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            signalSemaphoreInfo->deviceIndex = 0;
+
+            VkCommandBufferSubmitInfo* commandBufferInfo = new VkCommandBufferSubmitInfo{};
+            commandBufferInfo->sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            commandBufferInfo->commandBuffer = CONTEXT->commandBuffers[index];
+            commandBufferInfo->deviceMask = 1;
+
+            VkSubmitInfo2 submitInfo2{};
+            submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submitInfo2.waitSemaphoreInfoCount = 1;
+            submitInfo2.pWaitSemaphoreInfos = waitSemaphoreInfo;
+            submitInfo2.commandBufferInfoCount = 1;
+            submitInfo2.pCommandBufferInfos = commandBufferInfo;
+            submitInfo2.signalSemaphoreInfoCount = 1;
+            submitInfo2.pSignalSemaphoreInfos = signalSemaphoreInfo;
+
+            CONTEXT->drawFrameSubmitInfos[index] = submitInfo2;
+        }
+    }
+
+    void DestroySubmitInfos()
+    {
+        for (VkSubmitInfo2& submitInfo : CONTEXT->drawFrameSubmitInfos)
+        {
+            for (int i = 0; i < submitInfo.waitSemaphoreInfoCount; i++)
+                delete &submitInfo.pWaitSemaphoreInfos[i];
+
+            for (int i = 0; i < submitInfo.signalSemaphoreInfoCount; i++)
+                delete& submitInfo.pSignalSemaphoreInfos[i];
+
+            for (int i = 0; i < submitInfo.commandBufferInfoCount; i++)
+                delete& submitInfo.pCommandBufferInfos[i];
         }
     }
 
