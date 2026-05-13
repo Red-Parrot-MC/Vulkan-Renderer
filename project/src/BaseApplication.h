@@ -97,6 +97,9 @@ private:
         delete scene;
         DestroySubmitInfos();
         VulkanSetup::cleanup();
+
+        glfwDestroyWindow(CONTEXT->window);
+        glfwTerminate();
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {

@@ -7,6 +7,7 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 <h3>TODO:</h3>
 
 - [x] Synchronization 2
+- [ ] DeletionQueue
 - [ ] Dynamic Rendering
 - [ ] Depth Prepass
 - [ ] Vertex Pulling

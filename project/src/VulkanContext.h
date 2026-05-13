@@ -4,15 +4,18 @@
 #include <array>
 #include "structs.h"
 #include "VmaUsage.h"
+#include "DeletionQueue.h"
 
 
 class VulkanContext
 {
 public:
+    DeletionQueue applicationDeletionQueue{}; // gets flushed when the application closes
+    DeletionQueue resizeDeletionQueue{}; // gets flushed when resized
+
     GLFWwindow* window{};
 
     VkInstance instance{};
-    VkDebugUtilsMessengerEXT debugMessenger{};
     VkSurfaceKHR surface{};
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -48,15 +51,11 @@ public:
     uint32_t currentFrame = 0;
     bool framebufferResized = false;
 
-
     std::vector<VkBuffer> uniformBuffers{};
-    std::vector<VkDeviceMemory> uniformBuffersMemory{};
     std::vector<void*> uniformBuffersMapped{};
 
     VkDescriptorPool descriptorPool{};
 
-    VkImage depthImage{};
-    VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
     const int MAX_FRAMES_IN_FLIGHT{ 3 };

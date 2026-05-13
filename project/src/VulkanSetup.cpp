@@ -68,48 +68,16 @@ void VulkanSetup::recreateSwapChain() {
     if (glfwWindowShouldClose(CONTEXT->window)) return;
 
     vkDeviceWaitIdle(CONTEXT->device);
-    cleanupSwapChain();
+    CONTEXT->resizeDeletionQueue.Flush();
 
     createSwapChain();
     createGBuffers();
     createImageViews();
     createDepthResources();
     createFramebuffers();
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(CONTEXT->device, CONTEXT->renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(CONTEXT->device, CONTEXT->imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(CONTEXT->device, CONTEXT->inFlightFences[i], nullptr);
-    }
-
     createSyncObjects();
 
     CONTEXT->currentFrame = 0;
-}
-
-void VulkanSetup::cleanupSwapChain() {
-    for (gBuffer* b : CONTEXT->gBuffers)
-    {
-        vkDestroyImageView(CONTEXT->device, b->image.view, nullptr);
-
-        vkDestroyImage(CONTEXT->device, b->image.image, nullptr);
-        vkFreeMemory(CONTEXT->device, b->image.memory, nullptr);
-    }
-    CONTEXT->gBuffers.clear();
-
-    vkDestroyImageView(CONTEXT->device, CONTEXT->depthImageView, nullptr);
-    vkDestroyImage(CONTEXT->device, CONTEXT->depthImage, nullptr);
-    vkFreeMemory(CONTEXT->device, CONTEXT->depthImageMemory, nullptr);
-
-    for (auto framebuffer : CONTEXT->swapChainFramebuffers) {
-        vkDestroyFramebuffer(CONTEXT->device, framebuffer, nullptr);
-    }
-
-    for (auto imageView : CONTEXT->swapChainImageViews) {
-        vkDestroyImageView(CONTEXT->device, imageView, nullptr);
-    }
-
-    vkDestroySwapchainKHR(CONTEXT->device, CONTEXT->swapChain, nullptr);
 }
 
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
@@ -121,45 +89,8 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 void VulkanSetup::cleanup()
 {
-    cleanupSwapChain();
-
-    vmaDestroyPool(CONTEXT->vmaAllocator, CONTEXT->vmaPool);
-    vmaDestroyAllocator(CONTEXT->vmaAllocator);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
-        vkFreeMemory(CONTEXT->device, CONTEXT->uniformBuffersMemory[i], nullptr);
-    }
-
-    vkDestroyDescriptorPool(CONTEXT->device, CONTEXT->descriptorPool, nullptr);
-
-    vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->descriptorSetLayout, nullptr);
-
-    vkDestroyPipeline(CONTEXT->device, CONTEXT->graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(CONTEXT->device, CONTEXT->pipelineLayout, nullptr);
-
-    vkDestroyRenderPass(CONTEXT->device, CONTEXT->renderPass, nullptr);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(CONTEXT->device, CONTEXT->renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(CONTEXT->device, CONTEXT->imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(CONTEXT->device, CONTEXT->inFlightFences[i], nullptr);
-    }
-
-    vkDestroyCommandPool(CONTEXT->device, CONTEXT->commandPool, nullptr);
-
-    vkDestroyDevice(CONTEXT->device, nullptr);
-
-    if (enableValidationLayers) {
-        DestroyDebugUtilsMessengerEXT(CONTEXT->instance, CONTEXT->debugMessenger, nullptr);
-    }
-
-    vkDestroySurfaceKHR(CONTEXT->instance, CONTEXT->surface, nullptr);
-    vkDestroyInstance(CONTEXT->instance, nullptr);
-
-    glfwDestroyWindow(CONTEXT->window);
-
-    glfwTerminate();
+    CONTEXT->resizeDeletionQueue.Flush();
+    CONTEXT->applicationDeletionQueue.Flush();
 }
 
 
@@ -202,23 +133,47 @@ void VulkanSetup::createInstance() {
     if (vkCreateInstance(&createInfo, nullptr, &CONTEXT->instance) != VK_SUCCESS) {
         throw std::runtime_error("failed to create instance!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyInstance(CONTEXT->instance, nullptr);
+        }
+    );
+    
 }
 
 void VulkanSetup::setupDebugMessenger() {
     if (!enableValidationLayers) return;
 
+    VkDebugUtilsMessengerEXT debugMessenger{};
+
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
     populateDebugMessengerCreateInfo(createInfo);
 
-    if (CreateDebugUtilsMessengerEXT(CONTEXT->instance, &createInfo, nullptr, &CONTEXT->debugMessenger) != VK_SUCCESS) {
+    if (CreateDebugUtilsMessengerEXT(CONTEXT->instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
         throw std::runtime_error("failed to set up debug messenger!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        [debugMessenger]()
+        {
+            DestroyDebugUtilsMessengerEXT(CONTEXT->instance, debugMessenger, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createSurface() {
     if (glfwCreateWindowSurface(CONTEXT->instance, CONTEXT->window, nullptr, &CONTEXT->surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroySurfaceKHR(CONTEXT->instance, CONTEXT->surface, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::pickPhysicalDevice() {
@@ -319,6 +274,13 @@ void VulkanSetup::createLogicalDevice() {
 
     vkGetDeviceQueue(CONTEXT->device, indices.graphicsFamily.value(), 0, &CONTEXT->graphicsQueue);
     vkGetDeviceQueue(CONTEXT->device, indices.presentFamily.value(), 0, &CONTEXT->presentQueue);
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyDevice(CONTEXT->device, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::initializeVMA()
@@ -338,6 +300,14 @@ void VulkanSetup::initializeVMA()
     {
         throw std::runtime_error("failed to create vma pool!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vmaDestroyPool(CONTEXT->vmaAllocator, CONTEXT->vmaPool);
+            vmaDestroyAllocator(CONTEXT->vmaAllocator);
+        }
+    );
 
     //VkImageCreateInfo imageInfo{};
     //imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -421,6 +391,13 @@ void VulkanSetup::createSwapChain() {
 
     CONTEXT->swapChainImageFormat = surfaceFormat.format;
     CONTEXT->swapChainExtent = extent;
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroySwapchainKHR(CONTEXT->device, CONTEXT->swapChain, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createGBuffers()
@@ -436,6 +413,20 @@ void VulkanSetup::createGBuffers()
 
     // metalic roughness
     CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_UNORM, clearValue));
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        []()
+        {
+            for (gBuffer* b : CONTEXT->gBuffers)
+            {
+                vkDestroyImageView(CONTEXT->device, b->image.view, nullptr);
+
+                vkDestroyImage(CONTEXT->device, b->image.image, nullptr);
+                vkFreeMemory(CONTEXT->device, b->image.memory, nullptr);
+            }
+            CONTEXT->gBuffers.clear();
+        }
+    );
 }
 
 void VulkanSetup::createImageViews() {
@@ -444,6 +435,15 @@ void VulkanSetup::createImageViews() {
     for (uint32_t i = 0; i < CONTEXT->swapChainImages.size(); i++) {
         CONTEXT->swapChainImageViews[i] = ImageHelpers::createImageView(CONTEXT->swapChainImages[i], CONTEXT->swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        []()
+        {
+            for (auto imageView : CONTEXT->swapChainImageViews) {
+                vkDestroyImageView(CONTEXT->device, imageView, nullptr);
+            }
+        }
+    );
 }
 
 void VulkanSetup::createRenderPass()
@@ -556,6 +556,13 @@ void VulkanSetup::createRenderPass()
     if (vkCreateRenderPass(CONTEXT->device, &renderPassInfo, nullptr, &CONTEXT->renderPass) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyRenderPass(CONTEXT->device, CONTEXT->renderPass, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createDescriptorSetLayout() {
@@ -582,6 +589,13 @@ void VulkanSetup::createDescriptorSetLayout() {
     if (vkCreateDescriptorSetLayout(CONTEXT->device, &layoutInfo, nullptr, &CONTEXT->descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->descriptorSetLayout, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createGraphicsPipeline() {
@@ -732,6 +746,14 @@ void VulkanSetup::createGraphicsPipeline() {
 
     vkDestroyShaderModule(CONTEXT->device, fragShaderModule, nullptr);
     vkDestroyShaderModule(CONTEXT->device, vertShaderModule, nullptr);
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyPipeline(CONTEXT->device, CONTEXT->graphicsPipeline, nullptr);
+            vkDestroyPipelineLayout(CONTEXT->device, CONTEXT->pipelineLayout, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createCommandPool() {
@@ -745,17 +767,37 @@ void VulkanSetup::createCommandPool() {
     if (vkCreateCommandPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->commandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create command pool!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyCommandPool(CONTEXT->device, CONTEXT->commandPool, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createDepthResources() {
-    VkFormat depthFormat = findDepthFormat();
-    ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->depthImage, CONTEXT->depthImageMemory);
-    CONTEXT->depthImageView = ImageHelpers::createImageView(CONTEXT->depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    VkImage depthImage{};
+    VkDeviceMemory depthImageMemory{};
 
-    ImageHelpers::transitionImageLayout(CONTEXT->depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkFormat depthFormat = findDepthFormat();
+    ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+    CONTEXT->depthImageView = ImageHelpers::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+
+    ImageHelpers::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        [depthImage, depthImageMemory]()
+        {
+            vkDestroyImageView(CONTEXT->device, CONTEXT->depthImageView, nullptr);
+            vkDestroyImage(CONTEXT->device, depthImage, nullptr);
+            vkFreeMemory(CONTEXT->device, depthImageMemory, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createFramebuffers() {
+    std::vector<VkFramebuffer> swapChainFramebuffers{};
     CONTEXT->swapChainFramebuffers.resize(CONTEXT->swapChainImageViews.size());
 
     for (size_t i = 0; i < CONTEXT->swapChainImageViews.size(); i++) {
@@ -782,20 +824,41 @@ void VulkanSetup::createFramebuffers() {
             throw std::runtime_error("failed to create framebuffer!");
         }
     }
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        []()
+        {
+            for (auto framebuffer : CONTEXT->swapChainFramebuffers) {
+                vkDestroyFramebuffer(CONTEXT->device, framebuffer, nullptr);
+            }
+        }
+    );
 }
 
 void VulkanSetup::createUniformBuffers() {
+    std::vector<VkDeviceMemory> uniformBuffersMemory{};
+
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
     CONTEXT->uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     CONTEXT->uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->uniformBuffers[i], CONTEXT->uniformBuffersMemory[i]);
+        BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->uniformBuffers[i], uniformBuffersMemory[i]);
 
-        vkMapMemory(CONTEXT->device, CONTEXT->uniformBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->uniformBuffersMapped[i]);
+        vkMapMemory(CONTEXT->device, uniformBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->uniformBuffersMapped[i]);
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        [uniformBuffersMemory]()
+        {
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
+                vkFreeMemory(CONTEXT->device, uniformBuffersMemory[i], nullptr);
+            }
+        }
+    );
 }
 
 void VulkanSetup::createCommandBuffers() {
@@ -832,6 +895,17 @@ void VulkanSetup::createSyncObjects() {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     }
+
+    CONTEXT->resizeDeletionQueue.PushDeletor(
+        []()
+        {
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                vkDestroySemaphore(CONTEXT->device, CONTEXT->renderFinishedSemaphores[i], nullptr);
+                vkDestroySemaphore(CONTEXT->device, CONTEXT->imageAvailableSemaphores[i], nullptr);
+                vkDestroyFence(CONTEXT->device, CONTEXT->inFlightFences[i], nullptr);
+            }
+        }
+    );
 }
 
 void VulkanSetup::createDescriptorPool() {
@@ -850,6 +924,13 @@ void VulkanSetup::createDescriptorPool() {
     if (vkCreateDescriptorPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyDescriptorPool(CONTEXT->device, CONTEXT->descriptorPool, nullptr);
+        }
+    );
 }
 
 void VulkanSetup::createDebugNameInfo()

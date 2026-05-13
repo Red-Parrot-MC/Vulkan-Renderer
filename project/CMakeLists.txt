@@ -20,7 +20,7 @@ add_executable(${PROJECT_NAME}
     "src/DescriptorSetBuilder.h" 
     "src/Camera.h"
     "src/Application.h" 
-    "src/Application.cpp" "src/VmaUsage.h" )
+    "src/Application.cpp" "src/VmaUsage.h"  "src/DeletionQueue.h")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
