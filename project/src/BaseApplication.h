@@ -9,6 +9,7 @@
 #include <iostream>
 #include "Scene.h"
 #include "Camera.h"
+#include "ImageHelpers.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -175,9 +176,91 @@ private:
         VkCommandBuffer& commandBuffer = CONTEXT->commandBuffers[imageIndex];
         vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
 
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("failed to begin recording command buffer!");
+        }
+
+        VkImageSubresourceRange subresourceRange{};
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = 1;
+        subresourceRange.baseArrayLayer = 0;
+        subresourceRange.layerCount = 1;
+
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, subresourceRange);
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
+
+        // Set attachments for dynamic rendering
+        VkRenderingAttachmentInfo colorAttachment = {};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.imageView = CONTEXT->swapChainImageViews[imageIndex];
+        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.clearValue = { {0.0f, 0.0f, 0.0f, 1.0f} };
+
+        VkRenderingAttachmentInfo depthAttachment = {};
+        depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depthAttachment.imageView = CONTEXT->depthImageView;
+        depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.clearValue = { 1.0f, 0 };
+
+        std::vector<VkRenderingAttachmentInfo> colorAttachments{ colorAttachment };
+
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            VkRenderingAttachmentInfo bufferAttachment = {};
+            bufferAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            bufferAttachment.imageView = b->image.view;
+            bufferAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            bufferAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            bufferAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            bufferAttachment.clearValue = b->clearValue;
+
+            colorAttachments.push_back(bufferAttachment);
+        }
+
+        int width, height;
+        glfwGetWindowSize(CONTEXT->window, &width, &height);
+
+        VkRenderingInfo renderInfo{};
+        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        renderInfo.layerCount = 1;
+        renderInfo.colorAttachmentCount = colorAttachments.size();
+        renderInfo.pColorAttachments = colorAttachments.data();
+        renderInfo.pDepthAttachment = &depthAttachment;
+        renderInfo.pStencilAttachment = nullptr;
+
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
+
+        VkViewport viewport{};
+        viewport.width = width;
+        viewport.height = height;
+        viewport.minDepth = 0;
+        viewport.maxDepth = 1;
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = CONTEXT->swapChainExtent;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
         scene->RecordCommandBuffer(commandBuffer, imageIndex);
 
-        vkCmdEndRenderPass(commandBuffer);
+        vkCmdEndRendering(commandBuffer);
+
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, subresourceRange);
+
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }

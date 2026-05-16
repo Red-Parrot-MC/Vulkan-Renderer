@@ -8,10 +8,11 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 
 - [x] Synchronization 2
 - [x] DeletionQueue
-- [ ] Dynamic Rendering
+- [x] Dynamic Rendering
 - [ ] Depth Prepass
-- [ ] Vertex Pulling
 - [ ] Deferred Rendering
 - [ ] Physically Based Rendering
 - [ ] Image Based Lighting
 - [ ] Shadow Mapping
+- [ ] Refactoring
+- [ ] Vertex Pulling

@@ -35,14 +35,14 @@ void VulkanSetup::InitializeVulkan()
     createLogicalDevice();
     initializeVMA();
     createSwapChain();
+    createCommandPool();
     createGBuffers();
     createImageViews();
-    createRenderPass();
+    //createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
-    createCommandPool();
     createDepthResources();
-    createFramebuffers();
+    //createFramebuffers();
     createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
@@ -74,7 +74,7 @@ void VulkanSetup::recreateSwapChain() {
     createGBuffers();
     createImageViews();
     createDepthResources();
-    createFramebuffers();
+    //createFramebuffers();
     createSyncObjects();
 
     CONTEXT->currentFrame = 0;
@@ -218,8 +218,13 @@ void VulkanSetup::createLogicalDevice() {
 
     // Feature select
 
+    VkPhysicalDeviceShaderObjectFeaturesEXT shaderFeatures{};
+    shaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT;
+    shaderFeatures.shaderObject = VK_TRUE;
+
     VkPhysicalDeviceVulkan14Features features14{};
     features14.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+    //features14.pNext = &shaderFeatures;
 
     VkPhysicalDeviceVulkan13Features features13{};
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -722,8 +727,26 @@ void VulkanSetup::createGraphicsPipeline() {
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
+    std::vector<VkFormat> colorAttachmentFormats{
+        CONTEXT->swapChainImageFormat
+    };
+
+    for (gBuffer* b : CONTEXT->gBuffers)
+    {
+        colorAttachmentFormats.push_back(b->format);
+    }
+
+    VkFormat depthFormat = findDepthFormat();
+
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size());
+    renderingInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
+    renderingInfo.depthAttachmentFormat = depthFormat;
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -734,7 +757,7 @@ void VulkanSetup::createGraphicsPipeline() {
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = CONTEXT->pipelineLayout;
-    pipelineInfo.renderPass = CONTEXT->renderPass;
+    pipelineInfo.renderPass = /*CONTEXT->renderPass*/ VK_NULL_HANDLE;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
     pipelineInfo.basePipelineIndex = -1; // Optional
@@ -786,6 +809,8 @@ void VulkanSetup::createDepthResources() {
 
     ImageHelpers::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);
 
+    CONTEXT->depthImage = depthImage;
+
     CONTEXT->resizeDeletionQueue.PushDeletor(
         [depthImage, depthImageMemory]()
         {
@@ -797,7 +822,6 @@ void VulkanSetup::createDepthResources() {
 }
 
 void VulkanSetup::createFramebuffers() {
-    std::vector<VkFramebuffer> swapChainFramebuffers{};
     CONTEXT->swapChainFramebuffers.resize(CONTEXT->swapChainImageViews.size());
 
     for (size_t i = 0; i < CONTEXT->swapChainImageViews.size(); i++) {
@@ -967,10 +991,10 @@ void VulkanSetup::createDebugNameInfo()
     nameInfo.pObjectName = "Pipeline Layout (default)";
     vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 
-    nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
-    nameInfo.objectHandle = (uint64_t)CONTEXT->renderPass;
-    nameInfo.pObjectName = "Render Pass (default)";
-    vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+    //nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
+    //nameInfo.objectHandle = (uint64_t)CONTEXT->renderPass;
+    //nameInfo.pObjectName = "Render Pass (default)";
+    //vkSetDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 }
 
 

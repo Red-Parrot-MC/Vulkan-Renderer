@@ -15,10 +15,10 @@ layout(location = 2) out vec2 outNormal;
 vec2 Encode(vec3 n);
 
 void main() {
-    outAlbedo = texture(texSampler, fragTexCoord);
+    outColor = texture(texSampler, fragTexCoord);
     outNormal = Encode(fragNormal);
-    if (outAlbedo.a < 0.5) discard;
-    outColor = outAlbedo;
+    if (outColor.a < 0.5) discard;
+    outAlbedo = outColor;
     //outColor = vec4(outNormal, 0, 1);
 }
 

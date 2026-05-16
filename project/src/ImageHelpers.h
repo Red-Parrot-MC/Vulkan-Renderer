@@ -174,6 +174,8 @@ public:
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
+        transitionImageLayout(buffer->image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_COLOR_BIT);
+
         return buffer;
     }
 };
