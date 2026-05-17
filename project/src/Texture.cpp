@@ -36,6 +36,7 @@ void Texture::CreateTextureImage(const char* filename)
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(filename, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
+    opaque = texChannels < 4; // if image has alpha -> not opaque
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");

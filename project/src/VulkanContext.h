@@ -38,6 +38,8 @@ public:
     VkDescriptorSetLayout descriptorSetLayout{};
     VkPipelineLayout pipelineLayout{};
     VkPipeline graphicsPipeline{};
+    VkPipeline depthPrepassPipeline{};
+    VkPipelineLayout depthPipelineLayout{};
 
     VkCommandPool commandPool{};
     std::vector<VkCommandBuffer> commandBuffers{};

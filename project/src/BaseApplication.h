@@ -10,6 +10,7 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "ImageHelpers.h"
+#include "DescriptorSetBuilder.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -229,19 +230,6 @@ private:
         int width, height;
         glfwGetWindowSize(CONTEXT->window, &width, &height);
 
-        VkRenderingInfo renderInfo{};
-        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        renderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
-        renderInfo.layerCount = 1;
-        renderInfo.colorAttachmentCount = colorAttachments.size();
-        renderInfo.pColorAttachments = colorAttachments.data();
-        renderInfo.pDepthAttachment = &depthAttachment;
-        renderInfo.pStencilAttachment = nullptr;
-
-        vkCmdBeginRendering(commandBuffer, &renderInfo);
-
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
-
         VkViewport viewport{};
         viewport.width = width;
         viewport.height = height;
@@ -255,7 +243,79 @@ private:
         scissor.extent = CONTEXT->swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        scene->RecordCommandBuffer(commandBuffer, imageIndex);
+        VkRenderingInfo depthRenderInfo{};
+        depthRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        depthRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        depthRenderInfo.layerCount = 1;
+        depthRenderInfo.colorAttachmentCount = 0;
+        depthRenderInfo.pColorAttachments = nullptr;
+        depthRenderInfo.pDepthAttachment = &depthAttachment;
+        depthRenderInfo.pStencilAttachment = nullptr;
+
+        vkCmdBeginRendering(commandBuffer, &depthRenderInfo);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPrepassPipeline);
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UniformBufferObject);
+
+        DescriptorSetBuilder descriptorSetBuilder{};
+        auto descriptorSets = descriptorSetBuilder
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
+            .Build();
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+
+        for (auto model : scene->models)
+        {
+            for (auto primitive : model->primitives)
+            {
+                if (primitive->isOpaque)
+                {
+                    VkBuffer vertexBuffers[] = { primitive->vertexBuffer };
+                    VkDeviceSize offsets[] = { 0 };
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+                    vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
+                }
+            }
+        }
+
+        vkCmdEndRendering(commandBuffer);
+
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_NONE;
+
+        VkRenderingInfo renderInfo{};
+        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        renderInfo.layerCount = 1;
+        renderInfo.colorAttachmentCount = colorAttachments.size();
+        renderInfo.pColorAttachments = colorAttachments.data();
+        renderInfo.pDepthAttachment = &depthAttachment;
+        renderInfo.pStencilAttachment = nullptr;
+
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
+
+        for (auto model : scene->models)
+        {
+            for (auto primitive : model->primitives)
+            {
+                VkBuffer vertexBuffers[] = { primitive->vertexBuffer };
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+                vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &model->materials[primitive->materialIndex]->descriptorSets[imageIndex], 0, nullptr);
+
+                vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
+            }
+        }
 
         vkCmdEndRendering(commandBuffer);
 

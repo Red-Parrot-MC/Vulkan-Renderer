@@ -7,6 +7,7 @@ class Texture
 public:
 	Texture(const char* filename, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
 	~Texture();
+	bool isOpaque() const { return opaque; }
 
 	uint32_t mipLevels;
 	VkImage textureImage{};
@@ -21,4 +22,5 @@ private:
 	void CreateTextureSampler();
 	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 	void CreateDebugNameInfo(const char* name);
+	bool opaque{};
 };

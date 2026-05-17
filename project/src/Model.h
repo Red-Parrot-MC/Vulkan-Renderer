@@ -18,6 +18,8 @@ public:
 	VkDeviceMemory vertexBufferMemory{};
 	VkDeviceMemory indexBufferMemory{};
 
+	bool isOpaque{};
+
 	void Initialize();
 
 private:

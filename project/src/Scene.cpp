@@ -270,6 +270,7 @@ bool Scene::LoadGLTF(std::string filename)
             }
 
             primitive->materialIndex = materialIndex - 1;
+            primitive->isOpaque = model->materials[materialIndex - 1]->color->isOpaque();
         }
     }
 
