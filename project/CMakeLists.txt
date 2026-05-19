@@ -20,7 +20,11 @@ add_executable(${PROJECT_NAME}
     "src/DescriptorSetBuilder.h" 
     "src/Camera.h"
     "src/Application.h" 
-    "src/Application.cpp" "src/VmaUsage.h"  "src/DeletionQueue.h" "src/PipelineBuilder.h" "src/PipelineBuilder.cpp")
+    "src/Application.cpp"
+    "src/VmaUsage.h"
+    "src/DeletionQueue.h"
+    "src/PipelineBuilder.h"
+    "src/PipelineBuilder.cpp")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
@@ -52,16 +56,23 @@ endforeach()
 
 # Compile shaders
 set(SHADER_COMPILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+set(SHADER_COMPILE_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
+
 file(GLOB_RECURSE SHADER_SOURCE_FILES
     "${SHADER_COMPILE_DIR}/*.vert"
     "${SHADER_COMPILE_DIR}/*.frag"
     "${SHADER_COMPILE_DIR}/*.comp"
 )
-set(SHADER_COMPILE_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled/")
+
 file(MAKE_DIRECTORY ${SHADER_COMPILE_OUT_DIR})
+
+set(SPIRV_BINARY_FILES)
+
 foreach(SHADER ${SHADER_SOURCE_FILES})
+
     get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
     get_filename_component(SHADER_EXT ${SHADER} EXT)
+
     if(SHADER_EXT STREQUAL ".vert")
         set(SHADER_STAGE "vert")
     elseif(SHADER_EXT STREQUAL ".frag")
@@ -70,13 +81,37 @@ foreach(SHADER ${SHADER_SOURCE_FILES})
         set(SHADER_STAGE "comp")
     endif()
 
-    message(STATUS "Compiling shader: ${SHADER} (stage: ${SHADER_STAGE})")
+    set(OUTPUT_FILE
+        "${SHADER_COMPILE_OUT_DIR}/${SHADER_NAME}_${SHADER_STAGE}.spv"
+    )
 
     add_custom_command(
-        TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND  glslangValidator -V -g ${SHADER} -o "${SHADER_COMPILE_OUT_DIR}/${SHADER_NAME}_${SHADER_STAGE}.spv"
+        OUTPUT ${OUTPUT_FILE}
+
+        COMMAND glslangValidator
+            -V
+            -g
+            ${SHADER}
+            -o ${OUTPUT_FILE}
+
+        DEPENDS ${SHADER}
+
+        COMMENT "Compiling shader ${SHADER}"
+        VERBATIM
     )
-endforeach(SHADER)
+
+    list(APPEND SPIRV_BINARY_FILES ${OUTPUT_FILE})
+
+endforeach()
+
+# Create shader compilation target
+add_custom_target(
+    CompileShaders ALL
+    DEPENDS ${SPIRV_BINARY_FILES}
+)
+
+# Make your executable depend on shaders
+add_dependencies(${PROJECT_NAME} CompileShaders)
 
 # Copy shaders to output folder
 set(SHADERS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
@@ -89,6 +124,7 @@ foreach(SHADER ${SHADER_FILES})
     add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${SHADER} ${SHADERS_OUT_DIR}
+        DEPENDS ${SHADER}
     )
 endforeach(SHADER)
 

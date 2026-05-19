@@ -174,6 +174,12 @@ static LayoutTransitionInfo getLayoutInfo(VkImageLayout layout)
             VK_PIPELINE_STAGE_NONE
         };
 
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+        return {
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+        };
+
     default:
         throw std::invalid_argument("Unsupported layout");
     }

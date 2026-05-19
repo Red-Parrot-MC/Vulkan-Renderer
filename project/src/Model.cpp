@@ -75,7 +75,7 @@ void Material::Initialize()
         descriptorSets = descriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageInfo)
-            .Build();
+            .Build(CONTEXT->descriptorSetLayout);
     }
 }
 

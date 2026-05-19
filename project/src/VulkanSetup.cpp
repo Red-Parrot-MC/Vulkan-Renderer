@@ -34,6 +34,7 @@ void VulkanSetup::InitializeVulkan()
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+    vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(CONTEXT->device, "vkSetDebugUtilsObjectNameEXT");
     initializeVMA();
     createSwapChain();
     createCommandPool();
@@ -43,14 +44,13 @@ void VulkanSetup::InitializeVulkan()
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createDepthPrepassPipeline();
+    createDeferredPipeline();
     createDepthResources();
     //createFramebuffers();
     createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
     createDescriptorPool();
-
-    vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(CONTEXT->device, "vkSetDebugUtilsObjectNameEXT");
 
     if (vkSetDebugUtilsObjectName)
         createDebugNameInfo();
@@ -633,7 +633,7 @@ void VulkanSetup::createGraphicsPipeline()
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 
     nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
-    nameInfo.objectHandle = (uint64_t)CONTEXT->graphicsPipeline;
+    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
     nameInfo.pObjectName = "Pipeline (default)";
     setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 
@@ -671,13 +671,91 @@ void VulkanSetup::createDepthPrepassPipeline()
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 
     nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
-    nameInfo.objectHandle = (uint64_t)CONTEXT->depthPrepassPipeline;
+    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
     nameInfo.pObjectName = "Pipeline (depth)";
     setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 
     nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
     nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipelineLayout();
     nameInfo.pObjectName = "Pipeline Layout (depth)";
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+}
+
+void VulkanSetup::createDeferredPipeline()
+{
+    VkDescriptorSetLayoutBinding depthSamplerLayoutBinding{};
+    depthSamplerLayoutBinding.binding = 0;
+    depthSamplerLayoutBinding.descriptorCount = 1;
+    depthSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    depthSamplerLayoutBinding.pImmutableSamplers = nullptr;
+    depthSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings{ depthSamplerLayoutBinding };
+
+    uint32_t index = 1;
+    for (gBuffer* g : CONTEXT->gBuffers)
+    {
+        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+        samplerLayoutBinding.binding = index;
+        samplerLayoutBinding.descriptorCount = 1;
+        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerLayoutBinding.pImmutableSamplers = nullptr;
+        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        bindings.push_back(samplerLayoutBinding);
+        index++;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(CONTEXT->device, &layoutInfo, nullptr, &CONTEXT->deferredDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        []()
+        {
+            vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->deferredDescriptorSetLayout, nullptr);
+        }
+    );
+
+
+
+
+    PipelineBuilder pipelineBuilder{};
+    pipelineBuilder
+        .AddShader("shaders/deferred_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+        .AddShader("shaders/deferred_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+        .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
+        .SetViewportState(1, 1)
+        .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
+        .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
+        .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
+        .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
+        .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+        .AddSetLayout(CONTEXT->deferredDescriptorSetLayout)
+        .SetDepthStencil(VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
+        .SetDepthFormat(PipelineBuilder::findDepthFormat())
+        .AddColorAttachmentFormat(CONTEXT->swapChainImageFormat);
+
+    CONTEXT->deferredPipeline = pipelineBuilder.Build();
+    CONTEXT->deferredPipelineLayout = pipelineBuilder.getPipelineLayout();
+    pipelineBuilder.AddToDeletionQueue(CONTEXT->applicationDeletionQueue);
+
+    VkDebugUtilsObjectNameInfoEXT nameInfo{};
+    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+
+    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
+    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
+    nameInfo.pObjectName = "Pipeline (deferred)";
+    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
+    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipelineLayout();
+    nameInfo.pObjectName = "Pipeline Layout (deferred)";
     setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 }
 
@@ -706,7 +784,7 @@ void VulkanSetup::createDepthResources() {
     VkDeviceMemory depthImageMemory{};
 
     VkFormat depthFormat = findDepthFormat();
-    ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+    ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
     CONTEXT->depthImageView = ImageHelpers::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
     ImageHelpers::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);

@@ -38,6 +38,7 @@ public:
 protected:
     Scene* scene{};
     Camera camera{};
+    VkSampler sampler{};
 
 private:
     virtual void Initialize() {}
@@ -59,6 +60,31 @@ private:
 	{
         VulkanSetup::InitializeVulkan();
         scene = new Scene{};
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(CONTEXT->physicalDevice, &properties);
+
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+        samplerInfo.minLod = 0.0f; // Optional
+        samplerInfo.mipLodBias = 0.0f; // Optional
+
+        if (vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
 	}
 
 	void mainLoop()
@@ -96,6 +122,7 @@ private:
 
 	void cleanupVulkan()
 	{
+        vkDestroySampler(CONTEXT->device, sampler, nullptr);
         delete scene;
         DestroySubmitInfos();
         VulkanSetup::cleanup();
@@ -263,7 +290,7 @@ private:
         DescriptorSetBuilder descriptorSetBuilder{};
         auto descriptorSets = descriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-            .Build();
+            .Build(CONTEXT->descriptorSetLayout);
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
 
@@ -273,9 +300,8 @@ private:
             {
                 if (primitive->isOpaque)
                 {
-                    VkBuffer vertexBuffers[] = { primitive->vertexBuffer };
                     VkDeviceSize offsets[] = { 0 };
-                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
 
                     vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -286,7 +312,7 @@ private:
 
         vkCmdEndRendering(commandBuffer);
 
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_NONE;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
         VkRenderingInfo renderInfo{};
         renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -305,9 +331,8 @@ private:
         {
             for (auto primitive : model->primitives)
             {
-                VkBuffer vertexBuffers[] = { primitive->vertexBuffer };
                 VkDeviceSize offsets[] = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
 
                 vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -319,7 +344,73 @@ private:
 
         vkCmdEndRendering(commandBuffer);
 
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            ImageHelpers::transitionImageLayout(commandBuffer, b->image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+        }
+
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, subresourceRange);
+
+        VkDescriptorImageInfo depthImageInfo{};
+        depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        depthImageInfo.imageView = CONTEXT->depthImageView;
+        depthImageInfo.sampler = sampler;
+
+        DescriptorSetBuilder deferredDescriptorSetBuilder{};
+        deferredDescriptorSetBuilder.AddWrite(0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+
+        uint32_t index = 1;
+        std::vector<VkDescriptorImageInfo*> imageInfos{};
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            VkDescriptorImageInfo* imageInfo = new VkDescriptorImageInfo{};
+            imageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo->imageView = b->image.view;
+            imageInfo->sampler = sampler;
+
+            imageInfos.push_back(imageInfo);
+
+            deferredDescriptorSetBuilder.AddWrite(index, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, imageInfo);
+            index++;
+        }
+
+        VkDescriptorSet descriptorSet = deferredDescriptorSetBuilder.Build(CONTEXT->deferredDescriptorSetLayout)[imageIndex];
+
+        for (auto i : imageInfos)
+            delete i;
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachments = { colorAttachment };
+
+        VkRenderingInfo deferredRenderInfo{};
+        deferredRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        deferredRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        deferredRenderInfo.layerCount = 1;
+        deferredRenderInfo.colorAttachmentCount = colorAttachments.size();
+        deferredRenderInfo.pColorAttachments = colorAttachments.data();
+        deferredRenderInfo.pDepthAttachment = nullptr;
+        deferredRenderInfo.pStencilAttachment = nullptr;
+
+        vkCmdBeginRendering(commandBuffer, &deferredRenderInfo);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipeline);
+
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+        vkCmdEndRendering(commandBuffer);
+
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, subresourceRange);
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, subresourceRange);
+
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            ImageHelpers::transitionImageLayout(commandBuffer, b->image.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
+        }
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");

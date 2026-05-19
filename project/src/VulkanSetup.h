@@ -24,6 +24,7 @@ private:
     static void createDescriptorSetLayout();
     static void createGraphicsPipeline();
     static void createDepthPrepassPipeline();
+    static void createDeferredPipeline();
     static void createCommandPool();
     static void createDepthResources();
     static void createFramebuffers();

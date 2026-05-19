@@ -31,6 +31,7 @@ public:
 	void AddToDeletionQueue(DeletionQueue& deletionQueue);
 
 	VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
+	VkPipeline getPipeline() const { return pipeline; }
 
 	static VkFormat findDepthFormat();
 private:

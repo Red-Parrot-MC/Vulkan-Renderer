@@ -84,9 +84,9 @@ public:
         return *this;
     }
 
-	std::vector<VkDescriptorSet> Build()
+	std::vector<VkDescriptorSet> Build(VkDescriptorSetLayout descriptorSetLayout)
 	{
-        std::vector<VkDescriptorSetLayout> layouts(CONTEXT->MAX_FRAMES_IN_FLIGHT, CONTEXT->descriptorSetLayout);
+        std::vector<VkDescriptorSetLayout> layouts(CONTEXT->MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = CONTEXT->descriptorPool;

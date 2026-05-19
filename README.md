@@ -10,7 +10,8 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 - [x] DeletionQueue
 - [x] Dynamic Rendering
 - [x] Depth Prepass
-- [ ] Deferred Rendering
+- [x] Deferred Rendering
+- [ ] Deferred Rendering Code Cleanup
 - [ ] Physically Based Rendering
 - [ ] Image Based Lighting
 - [ ] Shadow Mapping

@@ -36,10 +36,13 @@ public:
 
     VkRenderPass renderPass{};
     VkDescriptorSetLayout descriptorSetLayout{};
-    VkPipelineLayout pipelineLayout{};
     VkPipeline graphicsPipeline{};
+    VkPipelineLayout pipelineLayout{};
     VkPipeline depthPrepassPipeline{};
     VkPipelineLayout depthPipelineLayout{};
+    VkPipeline deferredPipeline{};
+    VkPipelineLayout deferredPipelineLayout{};
+    VkDescriptorSetLayout deferredDescriptorSetLayout{};
 
     VkCommandPool commandPool{};
     std::vector<VkCommandBuffer> commandBuffers{};
