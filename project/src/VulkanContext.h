@@ -29,12 +29,11 @@ public:
 
     VkSwapchainKHR swapChain{};
     std::vector<VkImage> swapChainImages{};
+    std::vector<VkImageView> swapChainImageViews{};
     VkFormat swapChainImageFormat{};
     VkExtent2D swapChainExtent{};
-    std::vector<VkImageView> swapChainImageViews{};
     std::vector<VkFramebuffer> swapChainFramebuffers{};
 
-    VkRenderPass renderPass{};
     VkDescriptorSetLayout descriptorSetLayout{};
     VkPipeline graphicsPipeline{};
     VkPipelineLayout pipelineLayout{};
@@ -61,10 +60,11 @@ public:
 
     VkDescriptorPool descriptorPool{};
 
-    VkImageView depthImageView{};
-    VkImage depthImage{};
+    //VkImageView depthImageView{};
+    //VkImage depthImage{};
+    Image depthImage{};
 
-    const int MAX_FRAMES_IN_FLIGHT{ 3 };
+    int MAX_FRAMES_IN_FLIGHT{ 2 };
 
     std::vector<gBuffer*> gBuffers{};
 };

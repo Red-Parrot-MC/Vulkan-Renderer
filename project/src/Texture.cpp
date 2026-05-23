@@ -4,6 +4,7 @@
 #include <stb_image.h>
 #include <stdexcept>
 #include <algorithm>
+#include <cstring>
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
@@ -15,7 +16,6 @@ Texture::Texture(const char* filename, VkFormat format)
 {
     this->format = format;
     CreateTextureImage(filename);
-    CreateTextureImageView();
     CreateTextureSampler();
 
     if (vkSetDebugUtilsObjectName)
@@ -25,23 +25,20 @@ Texture::Texture(const char* filename, VkFormat format)
 Texture::~Texture()
 {
     vkDestroySampler(CONTEXT->device, textureSampler, nullptr);
-    vkDestroyImageView(CONTEXT->device, textureImageView, nullptr);
-
-    vkDestroyImage(CONTEXT->device, textureImage, nullptr);
-    vkFreeMemory(CONTEXT->device, textureImageMemory, nullptr);
+    image.Destroy();
 }
 
 void Texture::CreateTextureImage(const char* filename)
 {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(filename, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-    opaque = texChannels < 4; // if image has alpha -> not opaque
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
 
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    opaque = texChannels < 4; // if image has alpha -> not opaque
     mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
     VkBuffer stagingBuffer;
@@ -55,20 +52,20 @@ void Texture::CreateTextureImage(const char* filename)
 
     stbi_image_free(pixels);
 
-    ImageHelpers::createImage(texWidth, texHeight, mipLevels, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+    image.Create(
+        texWidth, texHeight, mipLevels, format, 
+        VK_IMAGE_TILING_OPTIMAL, 
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    ImageHelpers::transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels, VK_IMAGE_ASPECT_COLOR_BIT);
-    ImageHelpers::copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-    //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps 
+    image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    ImageHelpers::copyBufferToImage(stagingBuffer, image.getImage(), static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
     vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
     vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 
-    GenerateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
-}
-
-void Texture::CreateTextureImageView() {
-    textureImageView = ImageHelpers::createImageView(textureImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+    GenerateMipmaps(image.getImage(), format, texWidth, texHeight, mipLevels);
 }
 
 void Texture::CreateTextureSampler() {
@@ -159,21 +156,10 @@ void Texture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWi
 
 void Texture::CreateDebugNameInfo(const char* name)
 {
+    image.SetDebugNameInfo(name);
+
     VkDebugUtilsObjectNameInfoEXT nameInfo{};
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-    nameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
-    nameInfo.objectHandle = (uint64_t)textureImage;
-    nameInfo.pObjectName = name;
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
-    nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
-    nameInfo.objectHandle = (uint64_t)textureImageView;
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
-    nameInfo.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
-    nameInfo.objectHandle = (uint64_t)textureImageMemory;
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
     nameInfo.objectType = VK_OBJECT_TYPE_SAMPLER;
     nameInfo.objectHandle = (uint64_t)textureSampler;
     setDebugUtilsObjectName(CONTEXT->device, &nameInfo);

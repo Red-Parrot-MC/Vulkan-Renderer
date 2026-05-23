@@ -15,5 +15,6 @@ public:
 
 	std::vector<Model*> models{};
 private:
+	Material* createDefaultTextures();
 
 };

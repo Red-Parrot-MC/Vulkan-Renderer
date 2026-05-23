@@ -20,14 +20,12 @@ private:
     static void createSwapChain();
     static void createGBuffers();
     static void createImageViews();
-    static void createRenderPass();
     static void createDescriptorSetLayout();
     static void createGraphicsPipeline();
     static void createDepthPrepassPipeline();
     static void createDeferredPipeline();
     static void createCommandPool();
     static void createDepthResources();
-    static void createFramebuffers();
     static void createUniformBuffers();
     static void createCommandBuffers();
     static void createSyncObjects();

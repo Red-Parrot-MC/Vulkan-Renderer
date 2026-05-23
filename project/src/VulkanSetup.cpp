@@ -10,7 +10,6 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include "PipelineBuilder.h"
 
-const int MAX_FRAMES_IN_FLIGHT = 3;
 const int MAX_MODELS = 200;
 
 const std::vector<const char*> validationLayers = {
@@ -40,13 +39,11 @@ void VulkanSetup::InitializeVulkan()
     createCommandPool();
     createGBuffers();
     createImageViews();
-    //createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createDepthPrepassPipeline();
     createDeferredPipeline();
     createDepthResources();
-    //createFramebuffers();
     createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
@@ -76,7 +73,6 @@ void VulkanSetup::recreateSwapChain() {
     createGBuffers();
     createImageViews();
     createDepthResources();
-    //createFramebuffers();
     createSyncObjects();
 
     CONTEXT->currentFrame = 0;
@@ -306,35 +302,6 @@ void VulkanSetup::initializeVMA()
             vmaDestroyAllocator(CONTEXT->vmaAllocator);
         }
     );
-
-    //VkImageCreateInfo imageInfo{};
-    //imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    //imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    //imageInfo.extent.width = 128;
-    //imageInfo.extent.height = 128;
-    //imageInfo.extent.depth = 1;
-    //imageInfo.mipLevels = 1;
-    //imageInfo.arrayLayers = 1;
-    //imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
-    //imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    //imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    //imageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    //imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    //imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    //VmaAllocationCreateInfo allocInfo{};
-    //allocInfo.pool = CONTEXT->vmaPool;
-
-    //VmaAllocationInfo vmaAllocationInfo{};
-
-    //VkResult result = vmaCreateImage(CONTEXT->vmaAllocator, &imageInfo, &allocInfo, &CONTEXT->image, &CONTEXT->vmaAllocation, &vmaAllocationInfo);
-    //if (result != VK_SUCCESS)
-    //{
-    //    std::cout << string_VkResult(result) << "\n";
-    //    throw std::runtime_error("failed to create image using vma! ");
-    //}
-
-    //vmaDestroyImage(CONTEXT->vmaAllocator, CONTEXT->image, CONTEXT->vmaAllocation);
 }
 
 void VulkanSetup::createSwapChain() {
@@ -344,10 +311,17 @@ void VulkanSetup::createSwapChain() {
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    //uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    //if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+    //    imageCount = swapChainSupport.capabilities.maxImageCount;
+    //}
+
+    uint32_t imageCount = CONTEXT->MAX_FRAMES_IN_FLIGHT;
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
+        CONTEXT->MAX_FRAMES_IN_FLIGHT = imageCount;
     }
+    std::cout << "Image count: " << imageCount << "\n";
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -417,10 +391,7 @@ void VulkanSetup::createGBuffers()
         {
             for (gBuffer* b : CONTEXT->gBuffers)
             {
-                vkDestroyImageView(CONTEXT->device, b->image.view, nullptr);
-
-                vkDestroyImage(CONTEXT->device, b->image.image, nullptr);
-                vkFreeMemory(CONTEXT->device, b->image.memory, nullptr);
+                b->image.Destroy();
             }
             CONTEXT->gBuffers.clear();
         }
@@ -440,125 +411,6 @@ void VulkanSetup::createImageViews() {
             for (auto imageView : CONTEXT->swapChainImageViews) {
                 vkDestroyImageView(CONTEXT->device, imageView, nullptr);
             }
-        }
-    );
-}
-
-void VulkanSetup::createRenderPass()
-{
-    // Attachments
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = CONTEXT->swapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = findDepthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    std::vector<VkAttachmentDescription> attachments = {
-        colorAttachment,
-        depthAttachment,
-    };
-
-    for (gBuffer* b : CONTEXT->gBuffers)
-    {
-        VkAttachmentDescription bufferAttachment{};
-        bufferAttachment.format = b->format;
-        bufferAttachment.samples = b->sampleCount;
-        bufferAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        bufferAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        bufferAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        bufferAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        bufferAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        bufferAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        attachments.push_back(bufferAttachment);
-    }
-
-    // references
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    std::vector<VkAttachmentReference> references
-    {
-        colorAttachmentRef
-    };
-
-    uint32_t attachmentIndex = static_cast<uint32_t>(references.size());
-
-    for (gBuffer* b : CONTEXT->gBuffers)
-    {
-        attachmentIndex++;
-
-        VkAttachmentReference bufferReference{};
-        bufferReference.attachment = attachmentIndex;
-        bufferReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        references.push_back(bufferReference);
-    }
-
-    // subpasses
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = static_cast<uint32_t>(references.size());
-    subpass.pColorAttachments = references.data();
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    VkSubpassDescription subpass2{};
-    subpass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass2.colorAttachmentCount = static_cast<uint32_t>(references.size());
-    subpass2.pColorAttachments = references.data();
-    subpass2.pDepthStencilAttachment = &depthAttachmentRef;
-
-    std::vector<VkSubpassDescription> subpasses
-    {
-        subpass,
-    };
-
-    // dependency
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    // render pass info
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
-    renderPassInfo.pSubpasses = subpasses.data();
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(CONTEXT->device, &renderPassInfo, nullptr, &CONTEXT->renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
-    }
-
-    CONTEXT->applicationDeletionQueue.PushDeletor(
-        []()
-        {
-            vkDestroyRenderPass(CONTEXT->device, CONTEXT->renderPass, nullptr);
         }
     );
 }
@@ -607,13 +459,11 @@ void VulkanSetup::createGraphicsPipeline()
         .SetViewportState(1, 1)
         .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
         .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
-        .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
         .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
         .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
         .AddSetLayout(CONTEXT->descriptorSetLayout)
         .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_FALSE, VK_FALSE)
-        .SetDepthFormat(PipelineBuilder::findDepthFormat())
-        .AddColorAttachmentFormat(CONTEXT->swapChainImageFormat);
+        .SetDepthFormat(PipelineBuilder::findDepthFormat());
 
     for (auto& description : Vertex::getAttributeDescriptions())
         pipelineBuilder.AddAttributeDescription(description);
@@ -780,61 +630,34 @@ void VulkanSetup::createCommandPool() {
 }
 
 void VulkanSetup::createDepthResources() {
-    VkImage depthImage{};
-    VkDeviceMemory depthImageMemory{};
-
     VkFormat depthFormat = findDepthFormat();
-    ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
-    CONTEXT->depthImageView = ImageHelpers::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    //ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->depthImage.image, CONTEXT->depthImage.memory);
+    //CONTEXT->depthImage.view = ImageHelpers::createImageView(CONTEXT->depthImage.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
-    ImageHelpers::transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);
+    //ImageHelpers::transitionImageLayout(CONTEXT->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    CONTEXT->depthImage = depthImage;
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = CONTEXT->swapChainExtent.width;
+    imageInfo.extent.height = CONTEXT->swapChainExtent.height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = depthFormat;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    CONTEXT->resizeDeletionQueue.PushDeletor(
-        [depthImage, depthImageMemory]()
-        {
-            vkDestroyImageView(CONTEXT->device, CONTEXT->depthImageView, nullptr);
-            vkDestroyImage(CONTEXT->device, depthImage, nullptr);
-            vkFreeMemory(CONTEXT->device, depthImageMemory, nullptr);
-        }
-    );
-}
-
-void VulkanSetup::createFramebuffers() {
-    CONTEXT->swapChainFramebuffers.resize(CONTEXT->swapChainImageViews.size());
-
-    for (size_t i = 0; i < CONTEXT->swapChainImageViews.size(); i++) {
-        std::vector<VkImageView> attachments = {
-            CONTEXT->swapChainImageViews[i],
-            CONTEXT->depthImageView,
-        };
-
-        for (gBuffer* b : CONTEXT->gBuffers)
-        {
-            attachments.push_back(b->image.view);
-        }
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = CONTEXT->renderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = CONTEXT->swapChainExtent.width;
-        framebufferInfo.height = CONTEXT->swapChainExtent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(CONTEXT->device, &framebufferInfo, nullptr, &CONTEXT->swapChainFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create framebuffer!");
-        }
-    }
+    CONTEXT->depthImage.Create(imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
+    CONTEXT->depthImage.TransitionLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     CONTEXT->resizeDeletionQueue.PushDeletor(
         []()
         {
-            for (auto framebuffer : CONTEXT->swapChainFramebuffers) {
-                vkDestroyFramebuffer(CONTEXT->device, framebuffer, nullptr);
-            }
+            CONTEXT->depthImage.Destroy();
         }
     );
 }
@@ -844,11 +667,11 @@ void VulkanSetup::createUniformBuffers() {
 
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-    CONTEXT->uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->uniformBuffers.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMemory.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->uniformBuffersMapped.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
         BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->uniformBuffers[i], uniformBuffersMemory[i]);
 
         vkMapMemory(CONTEXT->device, uniformBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->uniformBuffersMapped[i]);
@@ -857,7 +680,7 @@ void VulkanSetup::createUniformBuffers() {
     CONTEXT->applicationDeletionQueue.PushDeletor(
         [uniformBuffersMemory]()
         {
-            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
                 vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
                 vkFreeMemory(CONTEXT->device, uniformBuffersMemory[i], nullptr);
             }
@@ -866,7 +689,7 @@ void VulkanSetup::createUniformBuffers() {
 }
 
 void VulkanSetup::createCommandBuffers() {
-    CONTEXT->commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->commandBuffers.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -880,9 +703,9 @@ void VulkanSetup::createCommandBuffers() {
 }
 
 void VulkanSetup::createSyncObjects() {
-    CONTEXT->imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    CONTEXT->inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->imageAvailableSemaphores.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->renderFinishedSemaphores.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->inFlightFences.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -891,7 +714,7 @@ void VulkanSetup::createSyncObjects() {
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
         if (vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->imageAvailableSemaphores[i]) != VK_SUCCESS ||
             vkCreateSemaphore(CONTEXT->device, &semaphoreInfo, nullptr, &CONTEXT->renderFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateFence(CONTEXT->device, &fenceInfo, nullptr, &CONTEXT->inFlightFences[i]) != VK_SUCCESS) {
@@ -903,7 +726,7 @@ void VulkanSetup::createSyncObjects() {
     CONTEXT->resizeDeletionQueue.PushDeletor(
         []()
         {
-            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
                 vkDestroySemaphore(CONTEXT->device, CONTEXT->renderFinishedSemaphores[i], nullptr);
                 vkDestroySemaphore(CONTEXT->device, CONTEXT->imageAvailableSemaphores[i], nullptr);
                 vkDestroyFence(CONTEXT->device, CONTEXT->inFlightFences[i], nullptr);
@@ -915,15 +738,15 @@ void VulkanSetup::createSyncObjects() {
 void VulkanSetup::createDescriptorPool() {
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolInfo.maxSets = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
 
     if (vkCreateDescriptorPool(CONTEXT->device, &poolInfo, nullptr, &CONTEXT->descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");

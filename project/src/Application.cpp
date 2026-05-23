@@ -3,6 +3,7 @@
 void Application::Initialize()
 {
 	scene->LoadGLTF("resources/sponza/Sponza.gltf");
+	scene->LoadGLTF("resources/Cactus/Cactus.gltf");
 
     std::cout << "\n\n\nCONTROLS: \n\tMoving: [WASDQE] \n\tLooking: [ARROWS / RMB]\n\n";
 }

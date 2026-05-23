@@ -66,9 +66,14 @@ void Material::Initialize()
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
+        //if (!color->image.getView() || !normal->image.getView() || !metalic_roughness->image.getView())
+        //{
+        //    throw std::invalid_argument("Material: image not initialized");
+        //}
+
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = color->textureImageView;
+        imageInfo.imageView = color->image.getView();
         imageInfo.sampler = color->textureSampler;
 
         DescriptorSetBuilder descriptorSetBuilder{};
@@ -81,18 +86,11 @@ void Material::Initialize()
 
 Material::~Material()
 {
-    delete color;
-    delete normal;
-    delete metalic_roughness;
+    //delete color;
+    //delete normal;
+    //delete metalic_roughness;
 }
 
-Material::Material(Texture* color)
-    : color{color}
-{ }
-Material::Material(Texture* color, Texture* normal)
-    : color{color}
-    , normal{normal}
-{ }
 Material::Material(Texture* color, Texture* normal, Texture* metalic_roughness)
     : color{ color }
     , normal{ normal }
@@ -133,6 +131,10 @@ Model::~Model()
     for (Material* m : materials)
         delete m;
 
+    for (Texture* t : textures)
+        delete t;
+
     primitives.clear();
     materials.clear();
+    textures.clear();
 }

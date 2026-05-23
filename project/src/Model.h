@@ -30,8 +30,6 @@ private:
 struct Material
 {
 public:
-	Material(Texture* color);
-	Material(Texture* color, Texture* normal);
 	Material(Texture* color, Texture* normal, Texture* metalic_roughness);
 	~Material();
 
@@ -52,6 +50,7 @@ public:
 
 	std::vector<Primitive*> primitives{};
 	std::vector<Material*> materials{};
+	std::vector<Texture*> textures{};
 
 	void Initialize();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer);

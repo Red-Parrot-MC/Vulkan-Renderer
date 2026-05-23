@@ -133,6 +133,10 @@ bool Scene::LoadGLTF(std::string filename)
     std::string baseUri = filename.substr(0, filename.find_last_of('/')) + '/';
 
     Model* model = new Model{};
+    model->materials.push_back(createDefaultTextures());
+    model->textures.push_back(model->materials[0]->color);
+    model->textures.push_back(model->materials[0]->normal);
+    model->textures.push_back(model->materials[0]->metalic_roughness);
     std::unordered_map<uint32_t, uint32_t> loadedMaterials{};
 
     uint32_t primitivesCount{ 0 };
@@ -243,25 +247,32 @@ bool Scene::LoadGLTF(std::string filename)
                 Texture* albedo{}, * normal{}, * metallicRoughness{};
 
                 tg3_texture_info baseColorInfo = material.pbr_metallic_roughness.base_color_texture;
+                tg3_normal_texture_info normalInfo = material.normal_texture;
+                tg3_texture_info metallicRoughnessInfo = material.pbr_metallic_roughness.metallic_roughness_texture;
+
                 if (baseColorInfo.index > -1)
                 {
-                    tg3_image baseColorImage = tg3Model->images[tg3Model->textures[baseColorInfo.index].source];
-                    albedo = new Texture(std::string(baseUri + baseColorImage.uri.data).c_str());
+                    tg3_image image = tg3Model->images[tg3Model->textures[baseColorInfo.index].source];
+                    albedo = new Texture(std::string(baseUri + image.uri.data).c_str());
+                    model->textures.push_back(albedo);
                 }
+                else albedo = model->materials[0]->color;
 
-                tg3_normal_texture_info normalInfo = material.normal_texture;
                 if (normalInfo.index > -1)
                 {
-                    tg3_image normalImage = tg3Model->images[tg3Model->textures[normalInfo.index].source];
-                    normal = new Texture(std::string(baseUri + normalImage.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                    tg3_image image = tg3Model->images[tg3Model->textures[normalInfo.index].source];
+                    normal = new Texture(std::string(baseUri + image.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                    model->textures.push_back(normal);
                 }
+                else normal = model->materials[0]->normal;
 
-                tg3_texture_info metallicRoughnessInfo = material.pbr_metallic_roughness.metallic_roughness_texture;
                 if (metallicRoughnessInfo.index > -1)
                 {
-                    tg3_image metallicRoughnessImage = tg3Model->images[tg3Model->textures[metallicRoughnessInfo.index].source];
-                    metallicRoughness = new Texture(std::string(baseUri + metallicRoughnessImage.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                    tg3_image image = tg3Model->images[tg3Model->textures[metallicRoughnessInfo.index].source];
+                    metallicRoughness = new Texture(std::string(baseUri + image.uri.data).c_str(), VK_FORMAT_R8G8B8A8_UNORM);
+                    model->textures.push_back(metallicRoughness);
                 }
+                else metallicRoughness = model->materials[0]->metalic_roughness;
 
                 model->materials.push_back(new Material{ albedo, normal, metallicRoughness });
                 materialIndex = model->materials.size();
@@ -289,4 +300,14 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
     {
         model->RecordCommandBuffer(commandBuffer);
     }
+}
+
+Material* Scene::createDefaultTextures()
+{
+    Texture* color = new Texture("resources/textures/color_default.png");
+    Texture* normal = new Texture("resources/textures/normal_default.png");
+    Texture* metallicRoughness = new Texture("resources/textures/metalicRoughness_default.png");
+
+    Material* material = new Material(color, normal, metallicRoughness);
+    return material;
 }

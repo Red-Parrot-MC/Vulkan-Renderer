@@ -15,7 +15,6 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 const std::string WINDOW_NAME = "Vulkan";
-const int MAX_FRAMES_IN_FLIGHT = 3;
 
 class Scene;
 
@@ -163,7 +162,7 @@ private:
             throw std::runtime_error("failed to submit draw command buffer!");
         }
 
-        VkSemaphore signalSemaphores[] = { CONTEXT->renderFinishedSemaphores[CONTEXT->currentFrame] };
+        VkSemaphore signalSemaphores[] = { CONTEXT->renderFinishedSemaphores[imageIndex] };
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -188,7 +187,7 @@ private:
             throw std::runtime_error("failed to present swap chain image!");
         }
 
-        CONTEXT->currentFrame = (CONTEXT->currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        CONTEXT->currentFrame = (CONTEXT->currentFrame + 1) % CONTEXT->MAX_FRAMES_IN_FLIGHT;
     }
 
     void RecordCommandBuffers()
@@ -201,6 +200,8 @@ private:
 
     void RecordCommandBuffer(uint32_t imageIndex)
     {
+#pragma region Variable setup
+
         VkCommandBuffer& commandBuffer = CONTEXT->commandBuffers[imageIndex];
         vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
 
@@ -211,17 +212,6 @@ private:
             throw std::runtime_error("failed to begin recording command buffer!");
         }
 
-        VkImageSubresourceRange subresourceRange{};
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        subresourceRange.baseMipLevel = 0;
-        subresourceRange.levelCount = 1;
-        subresourceRange.baseArrayLayer = 0;
-        subresourceRange.layerCount = 1;
-
-        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, subresourceRange);
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
-
         // Set attachments for dynamic rendering
         VkRenderingAttachmentInfo colorAttachment = {};
         colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -231,21 +221,31 @@ private:
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         colorAttachment.clearValue = { {0.0f, 0.0f, 0.0f, 1.0f} };
 
-        VkRenderingAttachmentInfo depthAttachment = {};
-        depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        depthAttachment.imageView = CONTEXT->depthImageView;
-        depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.clearValue = { 1.0f, 0 };
+        VkRenderingAttachmentInfo depthPassDepthAttachment = {};
+        depthPassDepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depthPassDepthAttachment.imageView = CONTEXT->depthImage.getView();
+        depthPassDepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthPassDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthPassDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthPassDepthAttachment.clearValue = { 1.0f, 0 };
 
-        std::vector<VkRenderingAttachmentInfo> colorAttachments{ colorAttachment };
+        VkRenderingAttachmentInfo mainDepthAttachment = {};
+        mainDepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        mainDepthAttachment.imageView = CONTEXT->depthImage.getView();
+        mainDepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        mainDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        mainDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        mainDepthAttachment.clearValue = { 1.0f, 0 };
+
+        std::vector<VkRenderingAttachmentInfo> colorAttachments{};
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        std::vector<VkRenderingAttachmentInfo> deferredColorAttachments{ colorAttachment };
 
         for (gBuffer* b : CONTEXT->gBuffers)
         {
             VkRenderingAttachmentInfo bufferAttachment = {};
             bufferAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            bufferAttachment.imageView = b->image.view;
+            bufferAttachment.imageView = b->image.getView();
             bufferAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             bufferAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             bufferAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -263,12 +263,9 @@ private:
         viewport.minDepth = 0;
         viewport.maxDepth = 1;
 
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
         VkRect2D scissor{};
         scissor.offset = { 0, 0 };
         scissor.extent = CONTEXT->swapChainExtent;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         VkRenderingInfo depthRenderInfo{};
         depthRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -276,12 +273,26 @@ private:
         depthRenderInfo.layerCount = 1;
         depthRenderInfo.colorAttachmentCount = 0;
         depthRenderInfo.pColorAttachments = nullptr;
-        depthRenderInfo.pDepthAttachment = &depthAttachment;
+        depthRenderInfo.pDepthAttachment = &depthPassDepthAttachment;
         depthRenderInfo.pStencilAttachment = nullptr;
 
-        vkCmdBeginRendering(commandBuffer, &depthRenderInfo);
+        VkRenderingInfo mainRenderInfo{};
+        mainRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        mainRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        mainRenderInfo.layerCount = 1;
+        mainRenderInfo.colorAttachmentCount = colorAttachments.size();
+        mainRenderInfo.pColorAttachments = colorAttachments.data();
+        mainRenderInfo.pDepthAttachment = &mainDepthAttachment;
+        mainRenderInfo.pStencilAttachment = nullptr;
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPrepassPipeline);
+        VkRenderingInfo deferredRenderInfo{};
+        deferredRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        deferredRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        deferredRenderInfo.layerCount = 1;
+        deferredRenderInfo.colorAttachmentCount = deferredColorAttachments.size();
+        deferredRenderInfo.pColorAttachments = deferredColorAttachments.data();
+        deferredRenderInfo.pDepthAttachment = nullptr;
+        deferredRenderInfo.pStencilAttachment = nullptr;
 
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.offset = 0;
@@ -292,69 +303,9 @@ private:
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .Build(CONTEXT->descriptorSetLayout);
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
-
-        for (auto model : scene->models)
-        {
-            for (auto primitive : model->primitives)
-            {
-                if (primitive->isOpaque)
-                {
-                    VkDeviceSize offsets[] = { 0 };
-                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
-
-                    vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
-                }
-            }
-        }
-
-        vkCmdEndRendering(commandBuffer);
-
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-
-        VkRenderingInfo renderInfo{};
-        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        renderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
-        renderInfo.layerCount = 1;
-        renderInfo.colorAttachmentCount = colorAttachments.size();
-        renderInfo.pColorAttachments = colorAttachments.data();
-        renderInfo.pDepthAttachment = &depthAttachment;
-        renderInfo.pStencilAttachment = nullptr;
-
-        vkCmdBeginRendering(commandBuffer, &renderInfo);
-
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
-
-        for (auto model : scene->models)
-        {
-            for (auto primitive : model->primitives)
-            {
-                VkDeviceSize offsets[] = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
-
-                vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &model->materials[primitive->materialIndex]->descriptorSets[imageIndex], 0, nullptr);
-
-                vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
-            }
-        }
-
-        vkCmdEndRendering(commandBuffer);
-
-        for (gBuffer* b : CONTEXT->gBuffers)
-        {
-            ImageHelpers::transitionImageLayout(commandBuffer, b->image.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
-        }
-
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, subresourceRange);
-
         VkDescriptorImageInfo depthImageInfo{};
         depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-        depthImageInfo.imageView = CONTEXT->depthImageView;
+        depthImageInfo.imageView = CONTEXT->depthImage.getView();
         depthImageInfo.sampler = sampler;
 
         DescriptorSetBuilder deferredDescriptorSetBuilder{};
@@ -366,7 +317,7 @@ private:
         {
             VkDescriptorImageInfo* imageInfo = new VkDescriptorImageInfo{};
             imageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo->imageView = b->image.view;
+            imageInfo->imageView = b->image.getView();
             imageInfo->sampler = sampler;
 
             imageInfos.push_back(imageInfo);
@@ -375,46 +326,83 @@ private:
             index++;
         }
 
-        VkDescriptorSet descriptorSet = deferredDescriptorSetBuilder.Build(CONTEXT->deferredDescriptorSetLayout)[imageIndex];
+        VkDescriptorSet deferredDescriptorSet = deferredDescriptorSetBuilder.Build(CONTEXT->deferredDescriptorSetLayout)[imageIndex];
 
         for (auto i : imageInfos)
             delete i;
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+#pragma endregion
 
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachments = { colorAttachment };
+#pragma region Recording command buffer
 
-        VkRenderingInfo deferredRenderInfo{};
-        deferredRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        deferredRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
-        deferredRenderInfo.layerCount = 1;
-        deferredRenderInfo.colorAttachmentCount = colorAttachments.size();
-        deferredRenderInfo.pColorAttachments = colorAttachments.data();
-        deferredRenderInfo.pDepthAttachment = nullptr;
-        deferredRenderInfo.pStencilAttachment = nullptr;
+        CONTEXT->depthImage.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            b->image.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        vkCmdBeginRendering(commandBuffer, &depthRenderInfo);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPrepassPipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+
+        for (auto model : scene->models)
+        {
+            for (auto primitive : model->primitives)
+            {
+                if (primitive->isOpaque)
+                {
+                    VkDeviceSize offsets[] = { 0 };
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
+                    vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
+                }
+            }
+        }
+
+        vkCmdEndRendering(commandBuffer);
+
+        vkCmdBeginRendering(commandBuffer, &mainRenderInfo);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
+
+        for (auto model : scene->models)
+        {
+            for (auto primitive : model->primitives)
+            {
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
+                vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &model->materials[primitive->materialIndex]->descriptorSets[imageIndex], 0, nullptr);
+                vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
+            }
+        }
+
+        vkCmdEndRendering(commandBuffer);
+
+        for (gBuffer* b : CONTEXT->gBuffers)
+        {
+            b->image.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        CONTEXT->depthImage.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
         vkCmdBeginRendering(commandBuffer, &deferredRenderInfo);
-
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipelineLayout, 0, 1, &deferredDescriptorSet, 0, nullptr);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipeline);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
         vkCmdEndRendering(commandBuffer);
 
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, subresourceRange);
-        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, subresourceRange);
-
-        for (gBuffer* b : CONTEXT->gBuffers)
-        {
-            ImageHelpers::transitionImageLayout(commandBuffer, b->image.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
-        }
+        ImageHelpers::transitionImageLayout(commandBuffer, CONTEXT->swapChainImages[imageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_ASPECT_COLOR_BIT);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
+
+#pragma endregion
     }
 
     void CreateSubmitInfos()

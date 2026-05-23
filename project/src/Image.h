@@ -1,0 +1,36 @@
+#pragma once
+#include "vulkan/vulkan.h"
+#include "VmaUsage.h"
+
+class Image final
+{
+public:
+	Image();
+	~Image();
+
+	void SetDebugNameInfo(const char* name);
+	void Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT);
+	void Create(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT);
+	void Destroy();
+
+	void TransitionLayout(VkImageLayout newLayout);
+	void TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout);
+
+private:
+	VkImage image{};
+	VkImageView view{};
+	VmaAllocation vmaAllocation{};
+
+	VkImageLayout layout{};
+	VkFormat format{};
+	uint32_t mipLevels{};
+	VkImageAspectFlags aspectMask{};
+
+public:
+	VkImage getImage() const { return image; }
+	VkImageView getView() const { return view; }
+	VkImageLayout getLayout() const { return layout; }
+	VkFormat getFormat() const { return format; }
+	uint32_t getMipLevels() const { return mipLevels; }
+	VkImageAspectFlags getAspectMask() const { return aspectMask; }
+};
