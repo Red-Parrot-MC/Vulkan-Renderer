@@ -311,16 +311,15 @@ void VulkanSetup::createSwapChain() {
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
-    //uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    //if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-    //    imageCount = swapChainSupport.capabilities.maxImageCount;
-    //}
-
     uint32_t imageCount = CONTEXT->MAX_FRAMES_IN_FLIGHT;
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
-        CONTEXT->MAX_FRAMES_IN_FLIGHT = imageCount;
     }
+    if (imageCount < swapChainSupport.capabilities.minImageCount)
+    {
+        imageCount = swapChainSupport.capabilities.minImageCount;
+    }
+    CONTEXT->MAX_FRAMES_IN_FLIGHT = imageCount;
     std::cout << "Image count: " << imageCount << "\n";
 
     VkSwapchainCreateInfoKHR createInfo{};
