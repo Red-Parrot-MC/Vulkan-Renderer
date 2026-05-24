@@ -238,7 +238,6 @@ private:
         mainDepthAttachment.clearValue = { 1.0f, 0 };
 
         std::vector<VkRenderingAttachmentInfo> colorAttachments{};
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         std::vector<VkRenderingAttachmentInfo> deferredColorAttachments{ colorAttachment };
 
         for (gBuffer* b : CONTEXT->gBuffers)
@@ -309,9 +308,11 @@ private:
         depthImageInfo.sampler = sampler;
 
         DescriptorSetBuilder deferredDescriptorSetBuilder{};
-        deferredDescriptorSetBuilder.AddWrite(0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+        deferredDescriptorSetBuilder
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
+            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 1;
+        uint32_t index = 2;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {
@@ -471,6 +472,10 @@ private:
         ubo.view = glm::lookAt(camera.origin, camera.origin + camera.forward, camera.up);
         ubo.proj = glm::perspective(glm::radians(camera.fov), CONTEXT->swapChainExtent.width / (float)CONTEXT->swapChainExtent.height, camera.nearPlane, camera.farPlane);
         ubo.proj[1][1] *= -1;
+
+        ubo.cameraPos = glm::vec4(camera.origin, 0);
+        ubo.resolution.x = CONTEXT->swapChainExtent.width;
+        ubo.resolution.y = CONTEXT->swapChainExtent.height;
 
         memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }

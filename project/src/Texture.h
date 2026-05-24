@@ -6,7 +6,7 @@
 class Texture
 {
 public:
-	Texture(const char* filename, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+	Texture(const char* filename, VkFormat format);
 	~Texture();
 	bool isOpaque() const { 
 		if (this) return opaque;

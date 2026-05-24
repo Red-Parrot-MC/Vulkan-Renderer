@@ -2,6 +2,12 @@
 #include "structs.h"
 #include "Texture.h"
 
+struct BoundingBox
+{
+	glm::vec3 min{};
+	glm::vec3 max{};
+};
+
 class Primitive
 {
 public:
@@ -17,6 +23,8 @@ public:
 	VkBuffer indexBuffer{};
 	VkDeviceMemory vertexBufferMemory{};
 	VkDeviceMemory indexBufferMemory{};
+
+	BoundingBox boundingBox{};
 
 	bool isOpaque{};
 
@@ -42,6 +50,21 @@ public:
 	void Initialize();
 };
 
+enum class LightType
+{
+	Point,
+	Directional,
+	Spot // unused
+};
+
+struct Light
+{
+	glm::vec3 pos{};
+	glm::vec3 color{};
+	float intensity{};
+	LightType lightType{};
+};
+
 class Model
 {
 public:
@@ -51,6 +74,7 @@ public:
 	std::vector<Primitive*> primitives{};
 	std::vector<Material*> materials{};
 	std::vector<Texture*> textures{};
+	std::vector<Light> lights{};
 
 	void Initialize();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer);

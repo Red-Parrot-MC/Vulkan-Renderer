@@ -1,32 +1,150 @@
 #version 450
 
+// ------------ GLOBAL CONSTS -----------------
 const float PI = 3.14159265358979;
 const float INV_PI = 1 / PI;
 
-layout(binding = 0) uniform sampler2D depthSampler;
-layout(binding = 1) uniform sampler2D colorSampler;
-layout(binding = 2) uniform sampler2D normalSampler;
-layout(binding = 3) uniform sampler2D metallicSampler;
+// ------------ STRUCTS -----------------
+const uint PointLightType = 0;
+const uint DirectionalLightType = 1;
+
+struct Light
+{
+    vec3 pos;
+    float intensity;
+    vec3 color;
+    uint type;
+};
+
+struct PointLight
+{
+    vec3 pos;
+    vec3 color;
+};
+
+// ------------ FUNCTION DEFINITIONS -----------------
+vec3 Decode(vec2 f);
+vec3 GetWorldPositionFromDepth(in float depth, in ivec2 fragCoords, in ivec2 resolution, in mat4 invProj, in mat4 invView);
+
+float DistributionGGX(vec3 N, vec3 H, float roughness);
+float GeometrySchlickGGX(float NdotV, float roughness);
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
+vec3 fresnelSchlick(float cosTheta, vec3 F0);
+
+// ------------ BINDINGS -----------------
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    ivec2 resolution;
+    vec4 cameraPos;
+} ubo;
+
+layout(binding = 1) uniform sampler2D depthSampler;
+layout(binding = 2) uniform sampler2D colorSampler;
+layout(binding = 3) uniform sampler2D normalSampler;
+layout(binding = 4) uniform sampler2D metallicSampler;
 
 layout(location = 0) out vec4 outColor;
 
-vec3 Decode(vec2 f);
+// ------------ SHADER CONSTS -----------------
+const uint lightCount = 4;
+const Light lights[lightCount] = 
+    Light[lightCount]( 
+        Light(vec3(0.577, 0.577, -0.577), 0.2, vec3(1, 0.83, 0.24), DirectionalLightType),
+        Light(vec3(0, 0.2, 0), 2, vec3(1,0.9,0.8), PointLightType),
+        Light(vec3(5, 0.2, 0), 0.5, vec3(0, 1, 0), PointLightType),
+        Light(vec3(-5, 0.2, 0), 2, vec3(0, 0, 1), PointLightType)
+    );
 
+//const PointLight pointLights[pointLightCount] = 
+//  PointLight[pointLightCount]();
+
+const vec3 ambientColor = vec3(0.00025);
+
+// ------------ CODE -----------------
 void main()
 {
-	ivec2 pos;
-	pos.x = int(gl_FragCoord.x);
-	pos.y = int(gl_FragCoord.y);
+	ivec2 pos = ivec2(gl_FragCoord.xy);
 	float sampledDepth = texelFetch(depthSampler, pos, 0).r;
-	float depth = (2*0.1*100)/(100 + 0.1 - sampledDepth * (100 - 0.1)) / 100;
-    vec3 normal = Decode(texelFetch(normalSampler, pos, 0).xy);
+    if (sampledDepth >= 1) discard;
 
-	outColor = mix(texelFetch(colorSampler, pos, 0), vec4(0), pow(depth, 0.1));
+    mat4 testView = mat4(
+        vec4(0, 0, -1, 0),
+        vec4(0, 1, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, -1, 0, 1)
+    );
 
-	//outColor = vec4(depth / 100);
-	//outColor = vec4(texelFetch(depthSampler, pos, 0).r);
-    //outColor = vec4(normal, 1);
+    mat4 testProj = mat4(
+        vec4(1.81066, 0, 0, 0),
+        vec4(0, -2.41421, 0, 0),
+        vec4(0, 0, -1.001, -1),
+        vec4(0, 0, -1.0001, 0)
+    );
+    
+    const vec3 worldPosition = GetWorldPositionFromDepth(sampledDepth, 
+        pos, ubo.resolution, 
+        inverse(ubo.proj), inverse(ubo.view));
+    vec4 albedo = texelFetch(colorSampler, pos, 0);
+    vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
+    vec4 metallic = texelFetch(metallicSampler, pos, 0);
+
+    vec3 V = normalize(ubo.cameraPos.xyz - worldPosition);
+    
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, albedo.rgb, metallic.b);
+
+    vec3 Lo = vec3(0.0);
+    for (int i = 0; i < lightCount; i++)
+    {
+        vec3 L, H, radiance;
+        // calculate per-light radiance
+        if (lights[i].type == PointLightType)
+        {
+            L = normalize(lights[i].pos - worldPosition);
+            H = normalize(V + L);
+            float distance = length(lights[i].pos - worldPosition);
+            float attenuation = 1.0 / (distance * distance);
+            radiance = lights[i].color * lights[i].intensity;  
+        }
+        if (lights[i].type == DirectionalLightType)
+        {
+            L = lights[i].pos;
+            H = normalize(V + L);
+            radiance = lights[i].color * lights[i].intensity;
+        }
+
+        // cook-torrance brdf
+        float NDF = DistributionGGX(N, H, metallic.g);        
+        float G   = GeometrySmith(N, V, L, metallic.g);      
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+        
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic.b;
+        
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular     = numerator / denominator;  
+            
+        // add to outgoing radiance Lo
+        float NdotL = max(dot(N, L), 0.0);                
+        Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;
+    }
+
+    vec3 ambient = ambientColor * albedo.rgb;
+    vec3 color = ambient + Lo;
+	
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2));  
+
+    outColor = vec4(color, 1);
 }
+
+
+
+// ------------ FUNCTIONS -----------------
 
 vec3 Decode(vec2 f)
 {
@@ -45,3 +163,66 @@ vec3 Decode(vec2 f)
     n.z = scphi.y;
     return n;
 }
+
+// --- World Position From Depth
+vec3 GetWorldPositionFromDepth(in float depth,
+    in ivec2 fragCoords, in ivec2 resolution,
+    in mat4 invProj, in mat4 invView)
+{
+    // Convert from fragment coordinate system to NDC and
+    // reconstruct clip space coordinate position
+    vec2 ndc = vec2(
+        (float(fragCoords.x) / resolution.x) * 2.0f - 1.0f,
+        (float(fragCoords.y) / resolution.y) * 2.0f - 1.0f);
+    //ndc.y *=- 1.f;
+    const vec4 clipPos = vec4(ndc, depth, 1.0f);
+
+    // Inverse projection to view space
+    vec4 viewPos = invProj * clipPos;
+    viewPos /= viewPos.w;
+
+    // Inverse view to world space
+    vec4 worldPos = invView * viewPos;
+    return worldPos.xyz;
+}
+
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a      = roughness*roughness;
+    float a2     = a*a;
+    float NdotH  = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+	
+    float num   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+	
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float num   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+} 

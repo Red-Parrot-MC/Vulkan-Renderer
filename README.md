@@ -12,8 +12,11 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 - [x] Depth Prepass
 - [x] Deferred Rendering
 - [x] Deferred Rendering Code Cleanup
-- [ ] Physically Based Rendering
+- [x] Physically Based Rendering
 - [ ] Image Based Lighting
 - [ ] Shadow Mapping
 - [ ] Refactoring
 - [ ] Vertex Pulling?
+
+- [ ] descriptor set layout builder
+- [ ] use single sampler

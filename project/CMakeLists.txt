@@ -24,7 +24,9 @@ add_executable(${PROJECT_NAME}
     "src/VmaUsage.h"
     "src/DeletionQueue.h"
     "src/PipelineBuilder.h"
-    "src/PipelineBuilder.cpp" "src/Image.h" "src/Image.cpp")
+    "src/PipelineBuilder.cpp"
+    "src/Image.h"
+    "src/Image.cpp")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

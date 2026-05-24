@@ -64,7 +64,7 @@ public:
     //VkImage depthImage{};
     Image depthImage{};
 
-    int MAX_FRAMES_IN_FLIGHT{ 2 };
+    int MAX_FRAMES_IN_FLIGHT{ 3 };
 
     std::vector<gBuffer*> gBuffers{};
 };

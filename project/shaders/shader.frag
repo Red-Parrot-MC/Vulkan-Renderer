@@ -3,10 +3,13 @@
 const float PI = 3.14159265358979;
 const float INV_PI = 1 / PI;
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(binding = 1) uniform sampler2D colorSampler;
+layout(binding = 2) uniform sampler2D normalSampler;
+layout(binding = 3) uniform sampler2D metalicRoughnessSampler;
 
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec2 fragTexCoord;
+layout(location = 2) in vec4 fragTangent;
 
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec2 outNormal;
@@ -15,10 +18,30 @@ layout(location = 2) out vec4 outMetalic;
 vec2 Encode(vec3 n);
 
 void main() {
-    outAlbedo = texture(texSampler, fragTexCoord);
+    // ALBEDO
+    outAlbedo = texture(colorSampler, fragTexCoord);
     if (outAlbedo.a < 0.5) discard;
-    //outNormal = Encode(fragNormal);
-    outNormal = vec2(0, 1);
+
+    // NORMAL
+    vec3 normal = normalize(fragNormal);
+    vec3 tangent = normalize(fragTangent.xyz);
+    if (tangent.length() > 0.5)
+    {
+        vec3 binormal = cross(normal, tangent) * fragTangent.w;
+        vec3 sampledNormal = texture(normalSampler, fragTexCoord).xyz * 2.0 - 1;
+        mat3 TBN = mat3(
+            tangent,
+            binormal,
+            normal
+        );
+
+        normal = normalize(TBN * sampledNormal);
+    }
+
+    outNormal = Encode(normal);
+
+    // METALIC + ROUGHNESS
+    outMetalic = texture(metalicRoughnessSampler, fragTexCoord);
 }
 
 vec2 Encode(vec3 n) // Octahedron normal vector encoding

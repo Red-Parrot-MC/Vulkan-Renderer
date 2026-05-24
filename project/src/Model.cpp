@@ -66,20 +66,32 @@ void Material::Initialize()
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
-        //if (!color->image.getView() || !normal->image.getView() || !metalic_roughness->image.getView())
-        //{
-        //    throw std::invalid_argument("Material: image not initialized");
-        //}
+        if (!color->image.getView() || !normal->image.getView() || !metalic_roughness->image.getView())
+        {
+            throw std::invalid_argument("Material: image not initialized");
+        }
 
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = color->image.getView();
-        imageInfo.sampler = color->textureSampler;
+        VkDescriptorImageInfo colorInfo{};
+        colorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        colorInfo.imageView = color->image.getView();
+        colorInfo.sampler = color->textureSampler;
+
+        VkDescriptorImageInfo normalInfo{};
+        normalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        normalInfo.imageView = normal->image.getView();
+        normalInfo.sampler = normal->textureSampler;
+
+        VkDescriptorImageInfo metalicRoughnessInfo{};
+        metalicRoughnessInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        metalicRoughnessInfo.imageView = metalic_roughness->image.getView();
+        metalicRoughnessInfo.sampler = metalic_roughness->textureSampler;
 
         DescriptorSetBuilder descriptorSetBuilder{};
         descriptorSets = descriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &imageInfo)
+            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &colorInfo)
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &normalInfo)
+            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &metalicRoughnessInfo)
             .Build(CONTEXT->descriptorSetLayout);
     }
 }

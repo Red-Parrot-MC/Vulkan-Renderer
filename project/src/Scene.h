@@ -1,7 +1,11 @@
 #pragma once
 #include "Model.h"
 #include <string>
+#include <unordered_map>
 
+struct tg3_model;
+struct tg3_primitive;
+struct tg3_node;
 
 class Scene
 {
@@ -15,6 +19,7 @@ public:
 
 	std::vector<Model*> models{};
 private:
+	void LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg3Primitive, const tg3_node& node, Model* model, std::unordered_map<uint32_t, uint32_t>& loadedMaterials, std::string baseUri);
 	Material* createDefaultTextures();
 
 };

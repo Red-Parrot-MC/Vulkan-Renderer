@@ -320,7 +320,6 @@ void VulkanSetup::createSwapChain() {
         imageCount = swapChainSupport.capabilities.minImageCount;
     }
     CONTEXT->MAX_FRAMES_IN_FLIGHT = imageCount;
-    std::cout << "Image count: " << imageCount << "\n";
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -383,7 +382,7 @@ void VulkanSetup::createGBuffers()
     CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue));
 
     // metalic roughness
-    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_UNORM, clearValue));
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8_UNORM, clearValue));
 
     CONTEXT->resizeDeletionQueue.PushDeletor(
         []()
@@ -422,14 +421,28 @@ void VulkanSetup::createDescriptorSetLayout() {
     uboLayoutBinding.pImmutableSamplers = nullptr;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding colorSamplerLayoutBinding{};
+    colorSamplerLayoutBinding.binding = 1;
+    colorSamplerLayoutBinding.descriptorCount = 1;
+    colorSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    colorSamplerLayoutBinding.pImmutableSamplers = nullptr;
+    colorSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding};
+    VkDescriptorSetLayoutBinding normalSamplerLayoutBinding{};
+    normalSamplerLayoutBinding.binding = 2;
+    normalSamplerLayoutBinding.descriptorCount = 1;
+    normalSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalSamplerLayoutBinding.pImmutableSamplers = nullptr;
+    normalSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding metalicRoughnessSamplerLayoutBinding{};
+    metalicRoughnessSamplerLayoutBinding.binding = 3;
+    metalicRoughnessSamplerLayoutBinding.descriptorCount = 1;
+    metalicRoughnessSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    metalicRoughnessSamplerLayoutBinding.pImmutableSamplers = nullptr;
+    metalicRoughnessSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 4> bindings = { uboLayoutBinding, colorSamplerLayoutBinding, normalSamplerLayoutBinding, metalicRoughnessSamplerLayoutBinding };
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -532,16 +545,23 @@ void VulkanSetup::createDepthPrepassPipeline()
 
 void VulkanSetup::createDeferredPipeline()
 {
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
     VkDescriptorSetLayoutBinding depthSamplerLayoutBinding{};
-    depthSamplerLayoutBinding.binding = 0;
+    depthSamplerLayoutBinding.binding = 1;
     depthSamplerLayoutBinding.descriptorCount = 1;
     depthSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     depthSamplerLayoutBinding.pImmutableSamplers = nullptr;
     depthSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings{ depthSamplerLayoutBinding };
+    std::vector<VkDescriptorSetLayoutBinding> bindings{ uboLayoutBinding, depthSamplerLayoutBinding };
 
-    uint32_t index = 1;
+    uint32_t index = 2;
     for (gBuffer* g : CONTEXT->gBuffers)
     {
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};

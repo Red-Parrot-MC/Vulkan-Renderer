@@ -18,13 +18,7 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"3DModel",
-			"rotation":[
-				0.7071068286895752,
-				0,
-				0,
-				0.7071068286895752
-			]
+			"name":"3DModel"
 		}
 	],
 	"materials":[
@@ -52,9 +46,10 @@
 					"attributes":{
 						"POSITION":0,
 						"NORMAL":1,
-						"TEXCOORD_0":2
+						"TEXCOORD_0":2,
+						"TANGENT":3
 					},
-					"indices":3,
+					"indices":4,
 					"material":0
 				}
 			]
@@ -77,61 +72,73 @@
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":26634,
+			"count":16480,
 			"max":[
-				0.40078699588775635,
-				0.42158201336860657,
-				0
+				0.09857243299484253,
+				0.45381367206573486,
+				0.09155011177062988
 			],
 			"min":[
-				-0.40078699588775635,
-				-0.42158201336860657,
-				-0.5045560002326965
+				-0.10708047449588776,
+				-0.011826714500784874,
+				-0.1252928376197815
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":26634,
+			"count":16480,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":26634,
+			"count":16480,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
+			"componentType":5126,
+			"count":16480,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":4,
 			"componentType":5123,
-			"count":133734,
+			"count":82698,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":319608,
+			"byteLength":197760,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":319608,
-			"byteOffset":319608,
+			"byteLength":197760,
+			"byteOffset":197760,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":213072,
-			"byteOffset":639216,
+			"byteLength":131840,
+			"byteOffset":395520,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":267468,
-			"byteOffset":852288,
+			"byteLength":263680,
+			"byteOffset":527360,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":165396,
+			"byteOffset":791040,
 			"target":34963
 		}
 	],
@@ -143,7 +150,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":1119756,
+			"byteLength":956436,
 			"uri":"Cactus.bin"
 		}
 	]
