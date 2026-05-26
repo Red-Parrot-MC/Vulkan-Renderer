@@ -9,6 +9,7 @@
 #include "DescriptorSetBuilder.h"
 #include <vulkan/vk_enum_string_helper.h>
 #include "PipelineBuilder.h"
+#include "Model.h"
 
 const int MAX_MODELS = 200;
 
@@ -552,16 +553,23 @@ void VulkanSetup::createDeferredPipeline()
     uboLayoutBinding.pImmutableSamplers = nullptr;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    VkDescriptorSetLayoutBinding lightLayoutBinding{};
+    lightLayoutBinding.binding = 1;
+    lightLayoutBinding.descriptorCount = 1;
+    lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightLayoutBinding.pImmutableSamplers = nullptr;
+    lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
     VkDescriptorSetLayoutBinding depthSamplerLayoutBinding{};
-    depthSamplerLayoutBinding.binding = 1;
+    depthSamplerLayoutBinding.binding = 2;
     depthSamplerLayoutBinding.descriptorCount = 1;
     depthSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     depthSamplerLayoutBinding.pImmutableSamplers = nullptr;
     depthSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings{ uboLayoutBinding, depthSamplerLayoutBinding };
+    std::vector<VkDescriptorSetLayoutBinding> bindings{ uboLayoutBinding, lightLayoutBinding, depthSamplerLayoutBinding };
 
-    uint32_t index = 2;
+    uint32_t index = 3;
     for (gBuffer* g : CONTEXT->gBuffers)
     {
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
@@ -702,6 +710,30 @@ void VulkanSetup::createUniformBuffers() {
             for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
                 vkDestroyBuffer(CONTEXT->device, CONTEXT->uniformBuffers[i], nullptr);
                 vkFreeMemory(CONTEXT->device, uniformBuffersMemory[i], nullptr);
+            }
+        }
+    );
+
+
+    // Lights
+    std::vector<VkDeviceMemory> lightsBuffersMemory{};
+    bufferSize = sizeof(Light) * CONTEXT->MAX_LIGHTS;
+    CONTEXT->lightBuffers.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    lightsBuffersMemory.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->lightBuffersMapped.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
+        BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->lightBuffers[i], lightsBuffersMemory[i]);
+
+        vkMapMemory(CONTEXT->device, lightsBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->lightBuffersMapped[i]);
+    }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        [lightsBuffersMemory]()
+        {
+            for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
+                vkDestroyBuffer(CONTEXT->device, CONTEXT->lightBuffers[i], nullptr);
+                vkFreeMemory(CONTEXT->device, lightsBuffersMemory[i], nullptr);
             }
         }
     );

@@ -57,6 +57,8 @@ public:
 
     std::vector<VkBuffer> uniformBuffers{};
     std::vector<void*> uniformBuffersMapped{};
+    std::vector<VkBuffer> lightBuffers{};
+    std::vector<void*> lightBuffersMapped{};
 
     VkDescriptorPool descriptorPool{};
 
@@ -67,6 +69,8 @@ public:
     int MAX_FRAMES_IN_FLIGHT{ 3 };
 
     std::vector<gBuffer*> gBuffers{};
+
+    const uint32_t MAX_LIGHTS{ 100 };
 };
 
 class CurrentVulkanContext

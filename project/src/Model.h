@@ -50,19 +50,25 @@ public:
 	void Initialize();
 };
 
-enum class LightType
+enum class LightType : uint32_t
 {
 	Point,
 	Directional,
-	Spot // unused
+	Ambient,
+	Spot, // unused
 };
 
 struct Light
 {
 	glm::vec3 pos{};
+	float intensity{}; // lumen for point, lux for directional
 	glm::vec3 color{};
-	float intensity{};
 	LightType lightType{};
+
+	Light() = default;
+	Light(glm::vec3 pos, float intensity, glm::vec3 color, LightType lightType);
+
+	void SetColorFromKelvin(float kelvin);
 };
 
 class Model
@@ -74,7 +80,6 @@ public:
 	std::vector<Primitive*> primitives{};
 	std::vector<Material*> materials{};
 	std::vector<Texture*> textures{};
-	std::vector<Light> lights{};
 
 	void Initialize();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer);

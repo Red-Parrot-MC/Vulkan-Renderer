@@ -13,6 +13,10 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 - [x] Deferred Rendering
 - [x] Deferred Rendering Code Cleanup
 - [x] Physically Based Rendering
+	- [x] Lights from cpu to gpu
+	- [x] Physical light units
+	- [ ] HDR
+	- [ ] Physical Camera Exposure
 - [ ] Image Based Lighting
 - [ ] Shadow Mapping
 - [ ] Refactoring
@@ -20,3 +24,4 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 
 - [ ] descriptor set layout builder
 - [ ] use single sampler
+- [ ] movable models

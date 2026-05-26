@@ -148,8 +148,6 @@ bool Scene::LoadGLTF(std::string filename)
         primitivesCount += mesh.primitives_count;
     }
 
-    std::cout << "Node count: " << tg3Model->nodes_count << '\n';
-
     for (uint32_t nodeIndex = 0; nodeIndex < tg3Model->nodes_count; nodeIndex++)
     {
         const tg3_node& node = tg3Model->nodes[nodeIndex];
@@ -203,12 +201,12 @@ bool Scene::LoadGLTF(std::string filename)
             {
                 light.lightType = LightType::Directional;
             }
-            if (type == "spots")
+            if (type == "spot")
             {
                 light.lightType = LightType::Spot;
             }
 
-            model->lights.push_back(light);
+            lights.push_back(light);
         }
     }
 

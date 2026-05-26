@@ -22,7 +22,7 @@ public:
 	PipelineBuilder& SetColorBlending(VkBool32 logicOpEnable, VkLogicOp logicOp, std::array<float, 4> blendConstants = std::array<float, 4>{ 0, 0, 0, 0 });
 	PipelineBuilder& SetDynamicStates(std::vector<VkDynamicState> dynamicStates);
 	PipelineBuilder& AddSetLayout(VkDescriptorSetLayout setLayout);
-	PipelineBuilder& AddPushConstantRange(VkPushConstantRange pushConstantRange);
+	PipelineBuilder& AddPushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
 	PipelineBuilder& SetDepthStencil(VkBool32 depthTestEnable, VkBool32 depthWriteEnable, VkCompareOp depthCompareOp, VkBool32 depthBoundsTestEnable, VkBool32 stencilTestEnable);
 	PipelineBuilder& SetDepthFormat(VkFormat depthAttachmentFormat);
 	PipelineBuilder& AddColorAttachmentFormat(VkFormat colorAttachmentFormat);

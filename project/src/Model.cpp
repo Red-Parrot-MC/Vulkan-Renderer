@@ -1,6 +1,7 @@
 #include "Model.h"
 #include "DescriptorSetBuilder.h"
 #include "BufferHelpers.h"
+#include <algorithm>
 
 Primitive::~Primitive()
 {
@@ -108,6 +109,29 @@ Material::Material(Texture* color, Texture* normal, Texture* metalic_roughness)
     , normal{ normal }
     , metalic_roughness{metalic_roughness}
 { }
+
+
+Light::Light(glm::vec3 pos, float intensity, glm::vec3 color, LightType lightType)
+{
+    this->pos = pos;
+    this->intensity = intensity;
+    this->color = color;
+    this->lightType = lightType;
+}
+
+void Light::SetColorFromKelvin(float kelvin)
+{
+    const float temp = kelvin / 100.f;
+    const float r = (temp <= 66.f) ? 1.f :
+        std::clamp(1.29293618606f * pow(temp - 60.f, -0.1332047592f), 0.f, 1.f);
+    const float g = (temp <= 66.f) ?
+        std::clamp(0.390081578769f * log(temp) - 0.63184144378f, 0.f, 1.f) :
+        std::clamp(1.12989086089f * pow(temp - 60.f, -0.0755148492f), 0.f, 1.f);
+    const float b = (temp >= 66.f) ? 1.f :
+        (temp <= 19.f) ? 0.f :
+        std::clamp(0.54320678911f * log(temp - 10.f) - 1.19625408914f, 0.f, 1.f);
+    color = { r, g, b };
+}
 
 
 void Model::Initialize()

@@ -139,9 +139,9 @@ PipelineBuilder& PipelineBuilder::AddSetLayout(VkDescriptorSetLayout setLayout)
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::AddPushConstantRange(VkPushConstantRange pushConstantRange)
+PipelineBuilder& PipelineBuilder::AddPushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size)
 {
-    pushConstantRanges.push_back(pushConstantRange);
+    pushConstantRanges.push_back(VkPushConstantRange{ stageFlags , offset, size });
 
     return *this;
 }

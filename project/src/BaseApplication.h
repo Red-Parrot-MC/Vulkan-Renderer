@@ -307,12 +307,17 @@ private:
         depthImageInfo.imageView = CONTEXT->depthImage.getView();
         depthImageInfo.sampler = sampler;
 
+        VkDescriptorBufferInfo lightBufferInfo{};
+        lightBufferInfo.offset = 0;
+        lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
+
         DescriptorSetBuilder deferredDescriptorSetBuilder{};
         deferredDescriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 2;
+        uint32_t index = 3;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {
@@ -467,7 +472,6 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        //ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.model = glm::mat4(1.0f);
         ubo.view = glm::lookAt(camera.origin, camera.origin + camera.forward, camera.up);
         ubo.proj = glm::perspective(glm::radians(camera.fov), CONTEXT->swapChainExtent.width / (float)CONTEXT->swapChainExtent.height, camera.nearPlane, camera.farPlane);
@@ -478,6 +482,13 @@ private:
         ubo.resolution.y = CONTEXT->swapChainExtent.height;
 
         memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+
+        //VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+        //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipeline);
+        //vkCmdPushConstants(cmd, CONTEXT->deferredPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Light) * CONTEXT->MAX_LIGHTS, scene->lights.data());
+        //BufferHelpers::endSingleTimeCommands(cmd);
+
+        memcpy(CONTEXT->lightBuffersMapped[currentImage], scene->lights.data(), sizeof(Light) * std::min(CONTEXT->MAX_LIGHTS, static_cast<uint32_t>(scene->lights.size())));
     }
 
 };

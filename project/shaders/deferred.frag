@@ -7,6 +7,7 @@ const float INV_PI = 1 / PI;
 // ------------ STRUCTS -----------------
 const uint PointLightType = 0;
 const uint DirectionalLightType = 1;
+const uint AmbientLightType = 2;
 
 struct Light
 {
@@ -40,27 +41,17 @@ layout(binding = 0) uniform UniformBufferObject {
     vec4 cameraPos;
 } ubo;
 
-layout(binding = 1) uniform sampler2D depthSampler;
-layout(binding = 2) uniform sampler2D colorSampler;
-layout(binding = 3) uniform sampler2D normalSampler;
-layout(binding = 4) uniform sampler2D metallicSampler;
+const int lightCount = 100;
+layout(binding = 1) uniform LightBufferObject {
+    Light lights[lightCount];
+} lightBuffer;
+
+layout(binding = 2) uniform sampler2D depthSampler;
+layout(binding = 3) uniform sampler2D colorSampler;
+layout(binding = 4) uniform sampler2D normalSampler;
+layout(binding = 5) uniform sampler2D metallicSampler;
 
 layout(location = 0) out vec4 outColor;
-
-// ------------ SHADER CONSTS -----------------
-const uint lightCount = 4;
-const Light lights[lightCount] = 
-    Light[lightCount]( 
-        Light(vec3(0.577, 0.577, -0.577), 0.2, vec3(1, 0.83, 0.24), DirectionalLightType),
-        Light(vec3(0, 0.2, 0), 2, vec3(1,0.9,0.8), PointLightType),
-        Light(vec3(5, 0.2, 0), 0.5, vec3(0, 1, 0), PointLightType),
-        Light(vec3(-5, 0.2, 0), 2, vec3(0, 0, 1), PointLightType)
-    );
-
-//const PointLight pointLights[pointLightCount] = 
-//  PointLight[pointLightCount]();
-
-const vec3 ambientColor = vec3(0.00025);
 
 // ------------ CODE -----------------
 void main()
@@ -98,21 +89,31 @@ void main()
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < lightCount; i++)
     {
-        vec3 L, H, radiance;
+        vec3 L, H, irradiance;
         // calculate per-light radiance
-        if (lights[i].type == PointLightType)
+        if (lightBuffer.lights[i].type == PointLightType)
         {
-            L = normalize(lights[i].pos - worldPosition);
+            vec3 distanceVector = lightBuffer.lights[i].pos - worldPosition;
+            float sqrDistance = max(dot(distanceVector, distanceVector), 0.0001);
+            L = normalize(distanceVector);
             H = normalize(V + L);
-            float distance = length(lights[i].pos - worldPosition);
-            float attenuation = 1.0 / (distance * distance);
-            radiance = lights[i].color * lights[i].intensity;  
+
+            const float luminousIntensity = lightBuffer.lights[i].intensity / (4 * PI);
+            const float attenuation = 1.0 / sqrDistance;
+            const float illuminance = luminousIntensity * attenuation;
+            irradiance = lightBuffer.lights[i].color * illuminance;  
         }
-        if (lights[i].type == DirectionalLightType)
+        if (lightBuffer.lights[i].type == DirectionalLightType)
         {
-            L = lights[i].pos;
+            L = lightBuffer.lights[i].pos;
             H = normalize(V + L);
-            radiance = lights[i].color * lights[i].intensity;
+
+            irradiance = lightBuffer.lights[i].color * lightBuffer.lights[i].intensity;
+        }
+        if (lightBuffer.lights[i].type == AmbientLightType)
+        {
+            Lo += albedo.rgb * lightBuffer.lights[i].color * lightBuffer.lights[i].intensity;
+            continue;
         }
 
         // cook-torrance brdf
@@ -130,14 +131,12 @@ void main()
             
         // add to outgoing radiance Lo
         float NdotL = max(dot(N, L), 0.0);                
-        Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;
+        Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL;
     }
 
-    vec3 ambient = ambientColor * albedo.rgb;
-    vec3 color = ambient + Lo;
+    vec3 color = Lo;
 	
     color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2));  
 
     outColor = vec4(color, 1);
 }
@@ -189,10 +188,13 @@ vec3 GetWorldPositionFromDepth(in float depth,
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
-    float a      = roughness*roughness;
-    float a2     = a*a;
-    float NdotH  = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
+    float a = roughness;
+    const bool squareRoughness = false;
+    if (squareRoughness)
+        a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
 	
     float num   = a2;
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
@@ -204,7 +206,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
+    float k = (r * r) / 8.0;
 
     float num   = NdotV;
     float denom = NdotV * (1.0 - k) + k;
