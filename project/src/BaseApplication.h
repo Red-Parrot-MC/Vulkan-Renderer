@@ -481,6 +481,9 @@ private:
         ubo.resolution.x = CONTEXT->swapChainExtent.width;
         ubo.resolution.y = CONTEXT->swapChainExtent.height;
 
+        ubo.invProj = glm::inverse(ubo.proj);
+        ubo.invView = glm::inverse(ubo.view);
+
         memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 
         //VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();

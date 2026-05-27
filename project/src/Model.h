@@ -29,6 +29,7 @@ public:
 	bool isOpaque{};
 
 	void Initialize();
+	void CalculateBounds();
 
 private:
 	void createVertexBuffer();
@@ -52,10 +53,11 @@ public:
 
 enum class LightType : uint32_t
 {
-	Point,
-	Directional,
-	Ambient,
-	Spot, // unused
+	// shader stops when it finds 0
+	Point = 1,
+	Directional = 2,
+	Ambient = 3,
+	Spot = 4, // unused
 };
 
 struct Light
@@ -81,6 +83,14 @@ public:
 	std::vector<Material*> materials{};
 	std::vector<Texture*> textures{};
 
+	BoundingBox boundingBox{};
+	glm::mat4 modelMatrix{ 1 };
+
+	// for model matrix
+	//std::vector<VkDescriptorSet> descriptorSets{}; // one for every frame in flight
+
 	void Initialize();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer);
+
+	void CalculateBounds();
 };

@@ -18,4 +18,7 @@ private:
 	// Members
 	double m_cursorX{};
 	double m_cursorY{};
+
+	std::vector<glm::vec3> rotationData{};
+	float brightHue{};
 };

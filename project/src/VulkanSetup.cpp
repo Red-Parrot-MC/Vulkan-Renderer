@@ -10,6 +10,8 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include "PipelineBuilder.h"
 #include "Model.h"
+#include "DescriptorSetLayoutBuilder.h"
+#include "CreateInfoHelpers.h"
 
 const int MAX_MODELS = 200;
 
@@ -415,50 +417,25 @@ void VulkanSetup::createImageViews() {
 }
 
 void VulkanSetup::createDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    VkDescriptorSetLayoutBinding colorSamplerLayoutBinding{};
-    colorSamplerLayoutBinding.binding = 1;
-    colorSamplerLayoutBinding.descriptorCount = 1;
-    colorSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    colorSamplerLayoutBinding.pImmutableSamplers = nullptr;
-    colorSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding normalSamplerLayoutBinding{};
-    normalSamplerLayoutBinding.binding = 2;
-    normalSamplerLayoutBinding.descriptorCount = 1;
-    normalSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    normalSamplerLayoutBinding.pImmutableSamplers = nullptr;
-    normalSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding metalicRoughnessSamplerLayoutBinding{};
-    metalicRoughnessSamplerLayoutBinding.binding = 3;
-    metalicRoughnessSamplerLayoutBinding.descriptorCount = 1;
-    metalicRoughnessSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    metalicRoughnessSamplerLayoutBinding.pImmutableSamplers = nullptr;
-    metalicRoughnessSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    std::array<VkDescriptorSetLayoutBinding, 4> bindings = { uboLayoutBinding, colorSamplerLayoutBinding, normalSamplerLayoutBinding, metalicRoughnessSamplerLayoutBinding };
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(CONTEXT->device, &layoutInfo, nullptr, &CONTEXT->descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
+    VkSampler sampler{};
+    auto samplerInfo = GetSamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
+    vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler);
 
     CONTEXT->applicationDeletionQueue.PushDeletor(
-        []()
+        [sampler]()
         {
-            vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->descriptorSetLayout, nullptr);
+            vkDestroySampler(CONTEXT->device, sampler, nullptr);
         }
     );
+
+    DescriptorSetLayoutBuilder setLayoutBuilder{};
+    CONTEXT->descriptorSetLayout = setLayoutBuilder
+        .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+        .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+        .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+        .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+        .Build();
+    setLayoutBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 }
 
 void VulkanSetup::createGraphicsPipeline()
@@ -490,7 +467,7 @@ void VulkanSetup::createGraphicsPipeline()
 
     CONTEXT->graphicsPipeline = pipelineBuilder.Build();
     CONTEXT->pipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.AddToDeletionQueue(CONTEXT->applicationDeletionQueue);
+    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 
     VkDebugUtilsObjectNameInfoEXT nameInfo{};
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -528,7 +505,7 @@ void VulkanSetup::createDepthPrepassPipeline()
 
     CONTEXT->depthPrepassPipeline = pipelineBuilder.Build();
     CONTEXT->depthPipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.AddToDeletionQueue(CONTEXT->applicationDeletionQueue);
+    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 
     VkDebugUtilsObjectNameInfoEXT nameInfo{};
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -546,60 +523,21 @@ void VulkanSetup::createDepthPrepassPipeline()
 
 void VulkanSetup::createDeferredPipeline()
 {
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding lightLayoutBinding{};
-    lightLayoutBinding.binding = 1;
-    lightLayoutBinding.descriptorCount = 1;
-    lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    lightLayoutBinding.pImmutableSamplers = nullptr;
-    lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding depthSamplerLayoutBinding{};
-    depthSamplerLayoutBinding.binding = 2;
-    depthSamplerLayoutBinding.descriptorCount = 1;
-    depthSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    depthSamplerLayoutBinding.pImmutableSamplers = nullptr;
-    depthSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings{ uboLayoutBinding, lightLayoutBinding, depthSamplerLayoutBinding };
+    DescriptorSetLayoutBuilder setLayoutBuilder{};
+    setLayoutBuilder
+        .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // ubo
+        .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // lights
+        .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // depth
 
     uint32_t index = 3;
     for (gBuffer* g : CONTEXT->gBuffers)
     {
-        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = index;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        bindings.push_back(samplerLayoutBinding);
+        setLayoutBuilder.AddBinding(index, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // gBuffer
         index++;
     }
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(CONTEXT->device, &layoutInfo, nullptr, &CONTEXT->deferredDescriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
-
-    CONTEXT->applicationDeletionQueue.PushDeletor(
-        []()
-        {
-            vkDestroyDescriptorSetLayout(CONTEXT->device, CONTEXT->deferredDescriptorSetLayout, nullptr);
-        }
-    );
-
-
+    CONTEXT->deferredDescriptorSetLayout = setLayoutBuilder.Build();
+    setLayoutBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 
 
     PipelineBuilder pipelineBuilder{};
@@ -620,7 +558,7 @@ void VulkanSetup::createDeferredPipeline()
 
     CONTEXT->deferredPipeline = pipelineBuilder.Build();
     CONTEXT->deferredPipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.AddToDeletionQueue(CONTEXT->applicationDeletionQueue);
+    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 
     VkDebugUtilsObjectNameInfoEXT nameInfo{};
     nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;

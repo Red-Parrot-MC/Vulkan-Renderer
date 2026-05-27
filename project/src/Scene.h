@@ -19,6 +19,10 @@ public:
 
 	std::vector<Model*> models{};
 	std::vector<Light> lights{};
+
+	BoundingBox boundingBox{};
+
+	void CalculateBounds();
 private:
 	void LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg3Primitive, const tg3_node& node, Model* model, std::unordered_map<uint32_t, uint32_t>& loadedMaterials, std::string baseUri);
 	Material* createDefaultTextures();

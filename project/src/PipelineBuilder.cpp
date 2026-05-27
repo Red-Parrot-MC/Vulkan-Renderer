@@ -228,7 +228,7 @@ VkPipeline PipelineBuilder::Build()
     return pipeline;
 }
 
-void PipelineBuilder::AddToDeletionQueue(DeletionQueue& deletionQueue)
+void PipelineBuilder::PushDeletionQueue(DeletionQueue& deletionQueue)
 {
     VkPipeline pipelineToDelete = pipeline;
     VkPipelineLayout layoutToDelete = pipelineLayout;

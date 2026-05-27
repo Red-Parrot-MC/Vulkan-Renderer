@@ -14,11 +14,7 @@ public:
 	}
 
 	uint32_t mipLevels{};
-	//VkImage textureImage{};
-	//VkDeviceMemory textureImageMemory{};
-	//VkImageView textureImageView{};
 	Image image{};
-	VkSampler textureSampler{};
 	VkFormat format{};
 
 private:

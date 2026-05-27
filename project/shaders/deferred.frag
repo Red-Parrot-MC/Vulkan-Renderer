@@ -5,9 +5,10 @@ const float PI = 3.14159265358979;
 const float INV_PI = 1 / PI;
 
 // ------------ STRUCTS -----------------
-const uint PointLightType = 0;
-const uint DirectionalLightType = 1;
-const uint AmbientLightType = 2;
+const uint PointLightType = 1;
+const uint DirectionalLightType = 2;
+const uint AmbientLightType = 3;
+const uint SpotLightType = 4;
 
 struct Light
 {
@@ -39,6 +40,8 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
     ivec2 resolution;
     vec4 cameraPos;
+    mat4 invView;
+    mat4 invProj;
 } ubo;
 
 const int lightCount = 100;
@@ -59,27 +62,13 @@ void main()
 	ivec2 pos = ivec2(gl_FragCoord.xy);
 	float sampledDepth = texelFetch(depthSampler, pos, 0).r;
     if (sampledDepth >= 1) discard;
-
-    mat4 testView = mat4(
-        vec4(0, 0, -1, 0),
-        vec4(0, 1, 0, 0),
-        vec4(1, 0, 0, 0),
-        vec4(0, -1, 0, 1)
-    );
-
-    mat4 testProj = mat4(
-        vec4(1.81066, 0, 0, 0),
-        vec4(0, -2.41421, 0, 0),
-        vec4(0, 0, -1.001, -1),
-        vec4(0, 0, -1.0001, 0)
-    );
     
     const vec3 worldPosition = GetWorldPositionFromDepth(sampledDepth, 
         pos, ubo.resolution, 
-        inverse(ubo.proj), inverse(ubo.view));
+        ubo.invProj, ubo.invView);
     vec4 albedo = texelFetch(colorSampler, pos, 0);
-    vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
     vec4 metallic = texelFetch(metallicSampler, pos, 0);
+    vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
 
     vec3 V = normalize(ubo.cameraPos.xyz - worldPosition);
     
@@ -89,14 +78,17 @@ void main()
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < lightCount; i++)
     {
-        vec3 L, H, irradiance;
+        if (lightBuffer.lights[i].type == 0) break;
+
+        vec3 L, irradiance;
         // calculate per-light radiance
         if (lightBuffer.lights[i].type == PointLightType)
         {
             vec3 distanceVector = lightBuffer.lights[i].pos - worldPosition;
+            if (dot(N, distanceVector) < 0) continue;
+
             float sqrDistance = max(dot(distanceVector, distanceVector), 0.0001);
             L = normalize(distanceVector);
-            H = normalize(V + L);
 
             const float luminousIntensity = lightBuffer.lights[i].intensity / (4 * PI);
             const float attenuation = 1.0 / sqrDistance;
@@ -106,7 +98,7 @@ void main()
         if (lightBuffer.lights[i].type == DirectionalLightType)
         {
             L = lightBuffer.lights[i].pos;
-            H = normalize(V + L);
+            if (dot(N, L) < 0) continue;
 
             irradiance = lightBuffer.lights[i].color * lightBuffer.lights[i].intensity;
         }
@@ -115,6 +107,8 @@ void main()
             Lo += albedo.rgb * lightBuffer.lights[i].color * lightBuffer.lights[i].intensity;
             continue;
         }
+
+        vec3 H = normalize(V + L);
 
         // cook-torrance brdf
         float NDF = DistributionGGX(N, H, metallic.g);        
@@ -126,11 +120,11 @@ void main()
         kD *= 1.0 - metallic.b;
         
         vec3 numerator    = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        float NdotL = max(dot(N, L), 0.0);     
+        float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
         vec3 specular     = numerator / denominator;  
             
-        // add to outgoing radiance Lo
-        float NdotL = max(dot(N, L), 0.0);                
+        // add to outgoing radiance Lo              
         Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL;
     }
 

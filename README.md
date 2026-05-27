@@ -18,10 +18,14 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 	- [ ] HDR
 	- [ ] Physical Camera Exposure
 - [ ] Image Based Lighting
+	- [ ] Load HDR Image
+	- [ ] Generate environment map
+	- [ ] generate mipmaps
+	- [ ] render skybox
+	- [ ] generate diffuse irradiance
+	- [ ] use diffuse irradiance
 - [ ] Shadow Mapping
 - [ ] Refactoring
-- [ ] Vertex Pulling?
-
-- [ ] descriptor set layout builder
-- [ ] use single sampler
-- [ ] movable models
+	- [x] descriptor set layout builder
+	- [x] use single sampler
+	- [ ] movable models

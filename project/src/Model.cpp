@@ -58,10 +58,20 @@ void Primitive::createIndexBuffer() {
     vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
 }
 
+void Primitive::CalculateBounds()
+{
+    boundingBox = {};
+    for (const Vertex& vertex : vertices)
+    {
+        boundingBox.min = min(vertex.pos, boundingBox.min);
+        boundingBox.max = max(vertex.pos, boundingBox.max);
+    }
+}
+
 
 void Material::Initialize()
 {
-    if (color != nullptr)
+    if (color != nullptr && normal != nullptr && metalic_roughness != nullptr)
     {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.offset = 0;
@@ -75,17 +85,17 @@ void Material::Initialize()
         VkDescriptorImageInfo colorInfo{};
         colorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         colorInfo.imageView = color->image.getView();
-        colorInfo.sampler = color->textureSampler;
+        //colorInfo.sampler = color->textureSampler;
 
         VkDescriptorImageInfo normalInfo{};
         normalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         normalInfo.imageView = normal->image.getView();
-        normalInfo.sampler = normal->textureSampler;
+        //normalInfo.sampler = normal->textureSampler;
 
         VkDescriptorImageInfo metalicRoughnessInfo{};
         metalicRoughnessInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         metalicRoughnessInfo.imageView = metalic_roughness->image.getView();
-        metalicRoughnessInfo.sampler = metalic_roughness->textureSampler;
+        //metalicRoughnessInfo.sampler = metalic_roughness->textureSampler;
 
         DescriptorSetBuilder descriptorSetBuilder{};
         descriptorSets = descriptorSetBuilder
@@ -134,6 +144,22 @@ void Light::SetColorFromKelvin(float kelvin)
 }
 
 
+Model::~Model()
+{
+    for (Primitive* p : primitives)
+        delete p;
+
+    for (Material* m : materials)
+        delete m;
+
+    for (Texture* t : textures)
+        delete t;
+
+    primitives.clear();
+    materials.clear();
+    textures.clear();
+}
+
 void Model::Initialize()
 {
     for (Material* m : materials)
@@ -141,6 +167,8 @@ void Model::Initialize()
 
     for (Primitive* p : primitives)
         p->Initialize();
+
+
 }
 
 void Model::RecordCommandBuffer(VkCommandBuffer commandBuffer)
@@ -159,18 +187,15 @@ void Model::RecordCommandBuffer(VkCommandBuffer commandBuffer)
     }
 }
 
-Model::~Model()
+void Model::CalculateBounds()
 {
-    for (Primitive* p : primitives)
-        delete p;
+    boundingBox = {};
+    for (Primitive* primitive : primitives)
+    {
+        if (primitive->boundingBox.min == primitive->boundingBox.max) // boundingbox not calculated yet
+            primitive->CalculateBounds();
 
-    for (Material* m : materials)
-        delete m;
-
-    for (Texture* t : textures)
-        delete t;
-
-    primitives.clear();
-    materials.clear();
-    textures.clear();
+        boundingBox.min = min(boundingBox.min, primitive->boundingBox.min);
+        boundingBox.max = max(boundingBox.max, primitive->boundingBox.max);
+    }
 }

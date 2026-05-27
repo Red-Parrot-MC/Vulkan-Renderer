@@ -471,3 +471,20 @@ Material* Scene::createDefaultTextures()
     Material* material = new Material(color, normal, metallicRoughness);
     return material;
 }
+
+void Scene::CalculateBounds()
+{
+    boundingBox = {};
+    for (Model* model : models)
+    {
+        if (model->boundingBox.min == model->boundingBox.max)
+            model->CalculateBounds();
+
+        glm::vec3 min = glm::vec4{ model->boundingBox.min, 1 } * model->modelMatrix;
+        glm::vec3 max = glm::vec4{ model->boundingBox.max, 1 } * model->modelMatrix;
+        boundingBox.min = glm::min(boundingBox.min, min);
+        boundingBox.min = glm::min(boundingBox.min, max);
+        boundingBox.max = glm::max(boundingBox.max, min);
+        boundingBox.max = glm::max(boundingBox.max, max);
+    }
+}

@@ -28,7 +28,7 @@ public:
 	PipelineBuilder& AddColorAttachmentFormat(VkFormat colorAttachmentFormat);
 	VkPipeline Build();
 
-	void AddToDeletionQueue(DeletionQueue& deletionQueue);
+	void PushDeletionQueue(DeletionQueue& deletionQueue);
 
 	VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
 	VkPipeline getPipeline() const { return pipeline; }

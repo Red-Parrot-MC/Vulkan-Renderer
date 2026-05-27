@@ -114,6 +114,8 @@ struct UniformBufferObject {
     glm::ivec2 resolution;
     std::byte buffer[8];
     glm::vec4 cameraPos;
+    glm::mat4 invView;
+    glm::mat4 invProj;
 };
 
 struct gBuffer
