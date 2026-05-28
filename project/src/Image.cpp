@@ -11,7 +11,6 @@ Image::Image()
 
 Image::~Image()
 {
-    Destroy();
 }
 
 void Image::SetDebugNameInfo(const char* name)
@@ -28,7 +27,7 @@ void Image::SetDebugNameInfo(const char* name)
     setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
 }
 
-void Image::Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspectMask)
+void Image::Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspectMask, VkImageViewType viewType)
 {
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.pool = CONTEXT->vmaPool;
@@ -47,7 +46,12 @@ void Image::Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspec
     mipLevels = createInfo.mipLevels;
     this->aspectMask = aspectMask;
 
-    view = ImageHelpers::createImageView(image, format, aspectMask, mipLevels);
+    VkImageSubresourceRange subResourceRange{};
+    subResourceRange.aspectMask = aspectMask;
+    subResourceRange.levelCount = mipLevels;
+    subResourceRange.layerCount = createInfo.arrayLayers;
+
+    view = ImageHelpers::createImageView(image, format, subResourceRange, viewType);
 }
 
 void Image::Create(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageAspectFlags aspectMask)
@@ -79,6 +83,12 @@ void Image::Destroy()
     vmaAllocation = VK_NULL_HANDLE;
 }
 
+void Image::DestroyConst() const
+{
+    vmaDestroyImage(CONTEXT->vmaAllocator, image, vmaAllocation);
+    if (view) vkDestroyImageView(CONTEXT->device, view, nullptr);
+}
+
 void Image::TransitionLayout(VkImageLayout newLayout)
 {
     ImageHelpers::transitionImageLayout(image, layout, newLayout, mipLevels, aspectMask);
@@ -87,4 +97,16 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 void Image::TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout)
 {
     ImageHelpers::transitionImageLayout(commandBuffer, image, layout, newLayout, aspectMask, mipLevels);
+}
+
+void Image::TransitionLayout(VkImageLayout newLayout, VkImageSubresourceRange subResourceRange)
+{
+    subResourceRange.aspectMask = aspectMask;
+    ImageHelpers::transitionImageLayout(image, layout, newLayout, subResourceRange);
+}
+
+void Image::TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout, VkImageSubresourceRange subResourceRange)
+{
+    subResourceRange.aspectMask = aspectMask;
+    ImageHelpers::transitionImageLayout(commandBuffer, image, layout, newLayout, subResourceRange);
 }

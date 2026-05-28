@@ -31,16 +31,27 @@ VkDescriptorSetLayout DescriptorSetLayoutBuilder::Build(VkDescriptorSetLayoutCre
 		throw std::runtime_error("failed to create descriptor set layout!");
 	}
 
+	if (deletionQueue)
+	{
+		PushDeletionQueue(*deletionQueue);
+	}
+
 	return layout;
 }
 
-void DescriptorSetLayoutBuilder::PushDeletionQueue(DeletionQueue& deletionQueue)
+DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::PushDeletionQueue(DeletionQueue& deletionQueue)
 {
-	VkDescriptorSetLayout layoutToDelete = layout;
-	deletionQueue.PushDeletor(
-		[layoutToDelete]()
-		{
-			vkDestroyDescriptorSetLayout(CONTEXT->device, layoutToDelete, nullptr);
-		}
-	);
+	if (layout)
+	{
+		VkDescriptorSetLayout layoutToDelete = layout;
+		deletionQueue.PushDeletor(
+			[layoutToDelete]()
+			{
+				vkDestroyDescriptorSetLayout(CONTEXT->device, layoutToDelete, nullptr);
+			}
+		);
+	}
+
+	this->deletionQueue = &deletionQueue;
+	return *this;
 }

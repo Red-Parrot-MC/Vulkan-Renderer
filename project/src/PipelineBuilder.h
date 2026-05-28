@@ -4,6 +4,7 @@
 #include <array>
 #include <vulkan/vulkan.h>
 #include "DeletionQueue.h"
+#include "structs.h"
 
 class PipelineBuilder final
 {
@@ -26,9 +27,10 @@ public:
 	PipelineBuilder& SetDepthStencil(VkBool32 depthTestEnable, VkBool32 depthWriteEnable, VkCompareOp depthCompareOp, VkBool32 depthBoundsTestEnable, VkBool32 stencilTestEnable);
 	PipelineBuilder& SetDepthFormat(VkFormat depthAttachmentFormat);
 	PipelineBuilder& AddColorAttachmentFormat(VkFormat colorAttachmentFormat);
-	VkPipeline Build();
+	PipelineBuilder& SetDebugName(std::string debugName);
+	PipelineBuilder& PushDeletionQueue(DeletionQueue& deletionQueue);
+	Pipeline Build();
 
-	void PushDeletionQueue(DeletionQueue& deletionQueue);
 
 	VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
 	VkPipeline getPipeline() const { return pipeline; }
@@ -57,4 +59,7 @@ private:
 
 	VkPipelineLayout pipelineLayout{};
 	VkPipeline pipeline{};
+
+	DeletionQueue* deletionQueue{};
+	std::string debugName{};
 };

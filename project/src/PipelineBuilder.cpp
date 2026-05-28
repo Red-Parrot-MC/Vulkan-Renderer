@@ -171,7 +171,52 @@ PipelineBuilder& PipelineBuilder::AddColorAttachmentFormat(VkFormat colorAttachm
     return *this;
 }
 
-VkPipeline PipelineBuilder::Build()
+PipelineBuilder& PipelineBuilder::SetDebugName(std::string debugName)
+{
+    if (pipeline)
+    {
+        std::string name = "Pipeline (" + debugName + ")";
+
+        VkDebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
+        nameInfo.objectHandle = (uint64_t)pipeline;
+        nameInfo.pObjectName = name.c_str();
+        setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+
+        name = "Pipeline Layout (" + debugName + ")";
+
+        nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
+        nameInfo.objectHandle = (uint64_t)pipelineLayout;
+        nameInfo.pObjectName = name.c_str();
+        setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+    }
+
+    this->debugName = debugName;
+    return *this;
+}
+
+PipelineBuilder& PipelineBuilder::PushDeletionQueue(DeletionQueue& deletionQueue)
+{
+    if (pipeline)
+    {
+        VkPipeline pipelineToDelete = pipeline;
+        VkPipelineLayout layoutToDelete = pipelineLayout;
+
+        deletionQueue.PushDeletor(
+            [pipelineToDelete, layoutToDelete]()
+            {
+                vkDestroyPipeline(CONTEXT->device, pipelineToDelete, nullptr);
+                vkDestroyPipelineLayout(CONTEXT->device, layoutToDelete, nullptr);
+            }
+        );
+    }
+
+    this->deletionQueue = &deletionQueue;
+    return *this;
+}
+
+Pipeline PipelineBuilder::Build()
 {
     colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
     colorBlending.pAttachments = colorBlendAttachments.data();
@@ -225,21 +270,17 @@ VkPipeline PipelineBuilder::Build()
         throw std::runtime_error("failed to create graphics pipeline!");
     }
 
-    return pipeline;
-}
+    if (deletionQueue)
+    {
+        PushDeletionQueue(*deletionQueue);
+    }
 
-void PipelineBuilder::PushDeletionQueue(DeletionQueue& deletionQueue)
-{
-    VkPipeline pipelineToDelete = pipeline;
-    VkPipelineLayout layoutToDelete = pipelineLayout;
+    if (debugName.length() > 0)
+    {
+        SetDebugName(debugName);
+    }
 
-    deletionQueue.PushDeletor(
-        [pipelineToDelete, layoutToDelete]()
-        {
-            vkDestroyPipeline(CONTEXT->device, pipelineToDelete, nullptr);
-            vkDestroyPipelineLayout(CONTEXT->device, layoutToDelete, nullptr);
-        }
-    );
+    return { pipeline, pipelineLayout };
 }
 
 

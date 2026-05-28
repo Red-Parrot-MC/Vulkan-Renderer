@@ -9,12 +9,15 @@ public:
 	~Image();
 
 	void SetDebugNameInfo(const char* name);
-	void Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT);
+	void Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D);
 	void Create(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT);
 	void Destroy();
+	void DestroyConst() const;
 
 	void TransitionLayout(VkImageLayout newLayout);
 	void TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout);
+	void TransitionLayout(VkImageLayout newLayout, VkImageSubresourceRange subResourceRange);
+	void TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout, VkImageSubresourceRange subResourceRange);
 
 private:
 	VkImage image{};

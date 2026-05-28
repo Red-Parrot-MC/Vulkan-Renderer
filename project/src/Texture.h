@@ -19,7 +19,6 @@ public:
 
 private:
 	void CreateTextureImage(const char* filename);
-	void CreateTextureSampler();
 	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 	void CreateDebugNameInfo(const char* name);
 	bool opaque{};

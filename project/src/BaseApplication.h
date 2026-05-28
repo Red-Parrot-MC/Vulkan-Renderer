@@ -31,13 +31,14 @@ public:
         CreateSubmitInfos();
 		mainLoop();
         Cleanup();
+        this->~BaseApplication();
 		cleanupVulkan();
 	}
 
 protected:
     Scene* scene{};
     Camera camera{};
-    VkSampler sampler{};
+    virtual ~BaseApplication() {};
 
 private:
     virtual void Initialize() {}
@@ -59,31 +60,6 @@ private:
 	{
         VulkanSetup::InitializeVulkan();
         scene = new Scene{};
-
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(CONTEXT->physicalDevice, &properties);
-
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
-        samplerInfo.minLod = 0.0f; // Optional
-        samplerInfo.mipLodBias = 0.0f; // Optional
-
-        if (vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture sampler!");
-        }
 	}
 
 	void mainLoop()
@@ -121,7 +97,6 @@ private:
 
 	void cleanupVulkan()
 	{
-        vkDestroySampler(CONTEXT->device, sampler, nullptr);
         delete scene;
         DestroySubmitInfos();
         VulkanSetup::cleanup();
@@ -305,7 +280,10 @@ private:
         VkDescriptorImageInfo depthImageInfo{};
         depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthImageInfo.imageView = CONTEXT->depthImage.getView();
-        depthImageInfo.sampler = sampler;
+
+        VkDescriptorImageInfo cubemapImageInfo{};
+        cubemapImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        cubemapImageInfo.imageView = scene->cubemap.cubemapImage.getView();
 
         VkDescriptorBufferInfo lightBufferInfo{};
         lightBufferInfo.offset = 0;
@@ -315,16 +293,16 @@ private:
         deferredDescriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
-            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
+            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 3;
+        uint32_t index = 4;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {
             VkDescriptorImageInfo* imageInfo = new VkDescriptorImageInfo{};
             imageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo->imageView = b->image.getView();
-            imageInfo->sampler = sampler;
 
             imageInfos.push_back(imageInfo);
 
@@ -352,8 +330,8 @@ private:
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         vkCmdBeginRendering(commandBuffer, &depthRenderInfo);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPrepassPipeline);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPassPipeline.pipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPassPipeline.layout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
 
         for (auto model : scene->models)
         {
@@ -372,7 +350,7 @@ private:
         vkCmdEndRendering(commandBuffer);
 
         vkCmdBeginRendering(commandBuffer, &mainRenderInfo);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->graphicsPipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->geometryPassPipeline.pipeline);
 
         for (auto model : scene->models)
         {
@@ -381,7 +359,7 @@ private:
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, &primitive->vertexBuffer, offsets);
                 vkCmdBindIndexBuffer(commandBuffer, primitive->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &model->materials[primitive->materialIndex]->descriptorSets[imageIndex], 0, nullptr);
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->geometryPassPipeline.layout, 0, 1, &model->materials[primitive->materialIndex]->descriptorSets[imageIndex], 0, nullptr);
                 vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitive->indices.size()), 1, 0, 0, 0);
             }
         }
@@ -395,8 +373,8 @@ private:
         CONTEXT->depthImage.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
         vkCmdBeginRendering(commandBuffer, &deferredRenderInfo);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipelineLayout, 0, 1, &deferredDescriptorSet, 0, nullptr);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.layout, 0, 1, &deferredDescriptorSet, 0, nullptr);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.pipeline);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 

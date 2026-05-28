@@ -160,7 +160,23 @@ public:
         return imageView;
     }
 
-    static gBuffer* createGBuffer(VkFormat format, VkClearValue clearValue)
+    static VkImageView createImageView(VkImage image, VkFormat format, VkImageSubresourceRange subresourceRange, VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = viewType;
+        viewInfo.format = format;
+        viewInfo.subresourceRange = subresourceRange;
+
+        VkImageView imageView;
+        if (vkCreateImageView(CONTEXT->device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create image view!");
+        }
+
+        return imageView;
+    }
+
+    static gBuffer* createGBuffer(VkFormat format, VkClearValue clearValue, const char* name)
     {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -183,7 +199,62 @@ public:
         buffer->sampleCount = VK_SAMPLE_COUNT_1_BIT;
         buffer->image.Create(imageInfo, VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT);
         buffer->image.TransitionLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        buffer->image.SetDebugNameInfo(name);
 
         return buffer;
+    }
+
+    static void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels, VkImageSubresourceRange subresourceRange) {
+        // Check if image format supports linear blitting
+        VkFormatProperties formatProperties;
+        vkGetPhysicalDeviceFormatProperties(CONTEXT->physicalDevice, imageFormat, &formatProperties);
+
+        if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+            throw std::runtime_error("texture image format does not support linear blitting!");
+        }
+
+        subresourceRange.levelCount = 1;
+
+        VkCommandBuffer commandBuffer = BufferHelpers::beginSingleTimeCommands();
+
+        int32_t mipWidth = texWidth;
+        int32_t mipHeight = texHeight;
+
+        for (uint32_t i = 1; i < mipLevels; i++) {
+            subresourceRange.baseMipLevel = i - 1;
+
+            ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+
+            VkImageBlit blit{};
+            blit.srcOffsets[0] = { 0, 0, 0 };
+            blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+            blit.srcSubresource.aspectMask = subresourceRange.aspectMask;
+            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.baseArrayLayer = subresourceRange.baseArrayLayer;
+            blit.srcSubresource.layerCount = subresourceRange.layerCount;
+            blit.dstOffsets[0] = { 0, 0, 0 };
+            blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+            blit.dstSubresource.aspectMask = subresourceRange.aspectMask;
+            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.baseArrayLayer = subresourceRange.baseArrayLayer;
+            blit.dstSubresource.layerCount = subresourceRange.layerCount;
+
+            vkCmdBlitImage(commandBuffer,
+                image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1, &blit,
+                VK_FILTER_LINEAR);
+
+                ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+
+            if (mipWidth > 1) mipWidth /= 2;
+            if (mipHeight > 1) mipHeight /= 2;
+        }
+
+        subresourceRange.baseMipLevel = mipLevels - 1;
+
+        ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+
+        BufferHelpers::endSingleTimeCommands(commandBuffer);
     }
 };

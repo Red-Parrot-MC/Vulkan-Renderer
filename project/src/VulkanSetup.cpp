@@ -42,10 +42,7 @@ void VulkanSetup::InitializeVulkan()
     createCommandPool();
     createGBuffers();
     createImageViews();
-    createDescriptorSetLayout();
-    createGraphicsPipeline();
-    createDepthPrepassPipeline();
-    createDeferredPipeline();
+    createPipelines();
     createDepthResources();
     createUniformBuffers();
     createCommandBuffers();
@@ -301,6 +298,11 @@ void VulkanSetup::initializeVMA()
     CONTEXT->applicationDeletionQueue.PushDeletor(
         []()
         {
+            //char* statsString = nullptr;
+            //vmaBuildStatsString(CONTEXT->vmaAllocator, &statsString, VK_TRUE);
+            //printf("%s\n", statsString);
+            //vmaFreeStatsString(CONTEXT->vmaAllocator, statsString);
+
             vmaDestroyPool(CONTEXT->vmaAllocator, CONTEXT->vmaPool);
             vmaDestroyAllocator(CONTEXT->vmaAllocator);
         }
@@ -379,13 +381,13 @@ void VulkanSetup::createGBuffers()
     clearValue.color = { 0, 0, 0, 1 };
 
     // albedo
-    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_SRGB, clearValue));
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8B8A8_UNORM, clearValue, "gBuffer Albedo"));
 
     // normals
-    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue));
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue, "gBuffer Normal"));
 
     // metalic roughness
-    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8_UNORM, clearValue));
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8_UNORM, clearValue, "gBuffer Metalic"));
 
     CONTEXT->resizeDeletionQueue.PushDeletor(
         []()
@@ -416,162 +418,125 @@ void VulkanSetup::createImageViews() {
     );
 }
 
-void VulkanSetup::createDescriptorSetLayout() {
-    VkSampler sampler{};
-    auto samplerInfo = GetSamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
-    vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler);
-
-    CONTEXT->applicationDeletionQueue.PushDeletor(
-        [sampler]()
-        {
-            vkDestroySampler(CONTEXT->device, sampler, nullptr);
-        }
-    );
-
-    DescriptorSetLayoutBuilder setLayoutBuilder{};
-    CONTEXT->descriptorSetLayout = setLayoutBuilder
-        .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-        .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
-        .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
-        .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
-        .Build();
-    setLayoutBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
-}
-
-void VulkanSetup::createGraphicsPipeline()
+void VulkanSetup::createPipelines()
 {
-    PipelineBuilder pipelineBuilder{};
-    pipelineBuilder
-        .AddShader("shaders/shader_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
-        .AddShader("shaders/shader_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
-        .AddBindingDescription(Vertex::getBindingDescription())
-        .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
-        .SetViewportState(1, 1)
-        .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
-        .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
-        .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-        .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
-        .AddSetLayout(CONTEXT->descriptorSetLayout)
-        .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_FALSE, VK_FALSE)
-        .SetDepthFormat(PipelineBuilder::findDepthFormat());
-
-    for (auto& description : Vertex::getAttributeDescriptions())
-        pipelineBuilder.AddAttributeDescription(description);
-
-    for (gBuffer* b : CONTEXT->gBuffers)
+    // ---------- SAMPLER ----------
+    VkSampler sampler{};
     {
-        pipelineBuilder
+        auto samplerInfo = CreateInfoHelpers::GetSamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
+        vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler);
+
+        CONTEXT->applicationDeletionQueue.PushDeletor(
+            [sampler]()
+            {
+                vkDestroySampler(CONTEXT->device, sampler, nullptr);
+            }
+        );
+    }
+
+    // ---------- GEOMETRY PASS ----------
+    {
+        DescriptorSetLayoutBuilder setLayoutBuilder{};
+        CONTEXT->descriptorSetLayout = setLayoutBuilder
+            .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+            .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+            .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler)
+            .Build();
+        setLayoutBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
+
+
+        PipelineBuilder gBufferPipelineBuilder{};
+        gBufferPipelineBuilder
+            .AddShader("shaders/shader_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+            .AddShader("shaders/shader_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+            .AddBindingDescription(Vertex::getBindingDescription())
+            .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
+            .SetViewportState(1, 1)
+            .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
+            .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
+            .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
+            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+            .AddSetLayout(CONTEXT->descriptorSetLayout)
+            .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_FALSE, VK_FALSE)
+            .SetDepthFormat(PipelineBuilder::findDepthFormat())
+            .PushDeletionQueue(CONTEXT->applicationDeletionQueue)
+            .SetDebugName("geometry");
+
+        for (auto& description : Vertex::getAttributeDescriptions())
+            gBufferPipelineBuilder.AddAttributeDescription(description);
+
+        for (gBuffer* b : CONTEXT->gBuffers)
+            gBufferPipelineBuilder
             .AddColorAttachmentFormat(b->format)
             .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
+
+        CONTEXT->geometryPassPipeline = gBufferPipelineBuilder.Build();
     }
 
-    CONTEXT->graphicsPipeline = pipelineBuilder.Build();
-    CONTEXT->pipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
 
-    VkDebugUtilsObjectNameInfoEXT nameInfo{};
-    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
-    nameInfo.pObjectName = "Pipeline (default)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipelineLayout();
-    nameInfo.pObjectName = "Pipeline Layout (default)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-}
-
-void VulkanSetup::createDepthPrepassPipeline()
-{
-    PipelineBuilder pipelineBuilder{};
-    pipelineBuilder
-        .AddShader("shaders/depth_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
-        .AddShader("shaders/depth_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
-        .AddBindingDescription(Vertex::getBindingDescription())
-        .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
-        .SetViewportState(1, 1)
-        .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
-        .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
-        .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-        .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
-        .AddSetLayout(CONTEXT->descriptorSetLayout)
-        .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
-        .SetDepthFormat(PipelineBuilder::findDepthFormat());
-
-    for (auto& description : Vertex::getAttributeDescriptions())
-        pipelineBuilder.AddAttributeDescription(description);
-
-    CONTEXT->depthPrepassPipeline = pipelineBuilder.Build();
-    CONTEXT->depthPipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
-
-    VkDebugUtilsObjectNameInfoEXT nameInfo{};
-    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
-    nameInfo.pObjectName = "Pipeline (depth)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipelineLayout();
-    nameInfo.pObjectName = "Pipeline Layout (depth)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-}
-
-void VulkanSetup::createDeferredPipeline()
-{
-    DescriptorSetLayoutBuilder setLayoutBuilder{};
-    setLayoutBuilder
-        .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // ubo
-        .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // lights
-        .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // depth
-
-    uint32_t index = 3;
-    for (gBuffer* g : CONTEXT->gBuffers)
+    // ---------- DEPTH PASS ----------
     {
-        setLayoutBuilder.AddBinding(index, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // gBuffer
-        index++;
+        PipelineBuilder depthPipelineBuilder{};
+        depthPipelineBuilder
+            .AddShader("shaders/depth_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+            .AddShader("shaders/depth_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+            .AddBindingDescription(Vertex::getBindingDescription())
+            .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
+            .SetViewportState(1, 1)
+            .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
+            .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
+            .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
+            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+            .AddSetLayout(CONTEXT->descriptorSetLayout)
+            .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
+            .SetDepthFormat(PipelineBuilder::findDepthFormat())
+            .PushDeletionQueue(CONTEXT->applicationDeletionQueue)
+            .SetDebugName("depth");
+
+        for (auto& description : Vertex::getAttributeDescriptions())
+            depthPipelineBuilder.AddAttributeDescription(description);
+
+        CONTEXT->depthPassPipeline = depthPipelineBuilder.Build();
     }
 
-    CONTEXT->deferredDescriptorSetLayout = setLayoutBuilder.Build();
-    setLayoutBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
+
+    // ---------- LIGHTING PASS ----------
+    {
+        DescriptorSetLayoutBuilder deferredSetLayoutBuilder{};
+        deferredSetLayoutBuilder
+            .PushDeletionQueue(CONTEXT->applicationDeletionQueue)
+            .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // ubo
+            .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // lights
+            .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler) // Cubemap
+            .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // depth
+        uint32_t index = 4;
+
+        for (gBuffer* g : CONTEXT->gBuffers)
+            deferredSetLayoutBuilder.AddBinding(index++, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // gBuffer
+        
+        CONTEXT->deferredDescriptorSetLayout = deferredSetLayoutBuilder.Build();
 
 
-    PipelineBuilder pipelineBuilder{};
-    pipelineBuilder
-        .AddShader("shaders/deferred_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
-        .AddShader("shaders/deferred_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
-        .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
-        .SetViewportState(1, 1)
-        .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
-        .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
-        .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
-        .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-        .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
-        .AddSetLayout(CONTEXT->deferredDescriptorSetLayout)
-        .SetDepthStencil(VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
-        .SetDepthFormat(PipelineBuilder::findDepthFormat())
-        .AddColorAttachmentFormat(CONTEXT->swapChainImageFormat);
-
-    CONTEXT->deferredPipeline = pipelineBuilder.Build();
-    CONTEXT->deferredPipelineLayout = pipelineBuilder.getPipelineLayout();
-    pipelineBuilder.PushDeletionQueue(CONTEXT->applicationDeletionQueue);
-
-    VkDebugUtilsObjectNameInfoEXT nameInfo{};
-    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipeline();
-    nameInfo.pObjectName = "Pipeline (deferred)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
-
-    nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
-    nameInfo.objectHandle = (uint64_t)pipelineBuilder.getPipelineLayout();
-    nameInfo.pObjectName = "Pipeline Layout (deferred)";
-    setDebugUtilsObjectName(CONTEXT->device, &nameInfo);
+        PipelineBuilder deferredPipelineBuilder{};
+        CONTEXT->lightingPassPipeline = deferredPipelineBuilder
+            .AddShader("shaders/deferred_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+            .AddShader("shaders/deferred_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+            .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
+            .SetViewportState(1, 1)
+            .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
+            .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
+            .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
+            .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
+            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+            .AddSetLayout(CONTEXT->deferredDescriptorSetLayout)
+            .SetDepthStencil(VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
+            .SetDepthFormat(PipelineBuilder::findDepthFormat())
+            .AddColorAttachmentFormat(CONTEXT->swapChainImageFormat)
+            .PushDeletionQueue(CONTEXT->applicationDeletionQueue)
+            .SetDebugName("lighting")
+            .Build();
+    }
 }
 
 void VulkanSetup::createCommandPool() {
@@ -617,6 +582,7 @@ void VulkanSetup::createDepthResources() {
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     CONTEXT->depthImage.Create(imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
+    CONTEXT->depthImage.SetDebugNameInfo("DepthImage");
     CONTEXT->depthImage.TransitionLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     CONTEXT->resizeDeletionQueue.PushDeletor(
@@ -725,11 +691,15 @@ void VulkanSetup::createSyncObjects() {
 }
 
 void VulkanSetup::createDescriptorPool() {
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    std::array<VkDescriptorPoolSize, 4> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    poolSizes[2].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    poolSizes[3].descriptorCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT * MAX_MODELS);
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -994,35 +964,4 @@ VkFormat VulkanSetup::findSupportedFormat(const std::vector<VkFormat>& candidate
     }
 
     throw std::runtime_error("failed to find supported format!");
-}
-
-std::vector<char> VulkanSetup::readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file: " + filename);
-    }
-
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-
-    file.close();
-
-    return buffer;
-}
-
-VkShaderModule VulkanSetup::createShaderModule(const std::vector<char>& code) {
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(CONTEXT->device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create shader module!");
-    }
-    return shaderModule;
 }

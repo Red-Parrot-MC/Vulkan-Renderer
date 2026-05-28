@@ -35,12 +35,9 @@ public:
     std::vector<VkFramebuffer> swapChainFramebuffers{};
 
     VkDescriptorSetLayout descriptorSetLayout{};
-    VkPipeline graphicsPipeline{};
-    VkPipelineLayout pipelineLayout{};
-    VkPipeline depthPrepassPipeline{};
-    VkPipelineLayout depthPipelineLayout{};
-    VkPipeline deferredPipeline{};
-    VkPipelineLayout deferredPipelineLayout{};
+    Pipeline geometryPassPipeline{};
+    Pipeline depthPassPipeline{};
+    Pipeline lightingPassPipeline{};
     VkDescriptorSetLayout deferredDescriptorSetLayout{};
 
     VkCommandPool commandPool{};

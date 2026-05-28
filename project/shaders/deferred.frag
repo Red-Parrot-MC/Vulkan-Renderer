@@ -49,10 +49,11 @@ layout(binding = 1) uniform LightBufferObject {
     Light lights[lightCount];
 } lightBuffer;
 
-layout(binding = 2) uniform sampler2D depthSampler;
-layout(binding = 3) uniform sampler2D colorSampler;
-layout(binding = 4) uniform sampler2D normalSampler;
-layout(binding = 5) uniform sampler2D metallicSampler;
+layout(binding = 2) uniform samplerCube cubeSampler;
+layout(binding = 3) uniform sampler2D depthSampler;
+layout(binding = 4) uniform sampler2D colorSampler;
+layout(binding = 5) uniform sampler2D normalSampler;
+layout(binding = 6) uniform sampler2D metallicSampler;
 
 layout(location = 0) out vec4 outColor;
 
@@ -61,19 +62,25 @@ void main()
 {
 	ivec2 pos = ivec2(gl_FragCoord.xy);
 	float sampledDepth = texelFetch(depthSampler, pos, 0).r;
-    if (sampledDepth >= 1) discard;
-    
     const vec3 worldPosition = GetWorldPositionFromDepth(sampledDepth, 
         pos, ubo.resolution, 
         ubo.invProj, ubo.invView);
+    
+    vec3 V = normalize(ubo.cameraPos.xyz - worldPosition);
+
+    if (sampledDepth >= 1) 
+    {
+        outColor = vec4(texture(cubeSampler, -V).rgb, 1);
+        return;
+    }
+    
     vec4 albedo = texelFetch(colorSampler, pos, 0);
-    vec4 metallic = texelFetch(metallicSampler, pos, 0);
+    vec2 metallic = texelFetch(metallicSampler, pos, 0).rg;
     vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
 
-    vec3 V = normalize(ubo.cameraPos.xyz - worldPosition);
     
     vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo.rgb, metallic.b);
+    F0 = mix(F0, albedo.rgb, metallic.g);
 
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < lightCount; i++)
@@ -111,13 +118,13 @@ void main()
         vec3 H = normalize(V + L);
 
         // cook-torrance brdf
-        float NDF = DistributionGGX(N, H, metallic.g);        
-        float G   = GeometrySmith(N, V, L, metallic.g);      
+        float NDF = DistributionGGX(N, H, metallic.r);        
+        float G   = GeometrySmith(N, V, L, metallic.r);      
         vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
         
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - metallic.b;
+        kD *= 1.0 - metallic.g;
         
         vec3 numerator    = NDF * G * F;
         float NdotL = max(dot(N, L), 0.0);     

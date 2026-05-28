@@ -62,22 +62,24 @@ void Application::Initialize()
 	scene->LoadGLTF("resources/sponza/Sponza.gltf");
 	scene->LoadGLTF("resources/Cactus/Cactus.gltf");
     scene->CalculateBounds();
-    std::cout << "Bounding box: (" << scene->boundingBox.min.x << ", " << scene->boundingBox.min.y << ", " << scene->boundingBox.min.z << "), (" << scene->boundingBox.max.x << ", " << scene->boundingBox.max.y << ", " << scene->boundingBox.max.z << ")\n";
+    //std::cout << "Bounding box: (" << scene->getBounds().min.x << ", " << scene->getBounds().min.y << ", " << scene->getBounds().min.z << "), (" << scene->getBounds().max.x << ", " << scene->getBounds().max.y << ", " << scene->getBounds().max.z << ")\n";
 	
 	scene->lights.push_back(Light({ 0, 0, 0 }, 0.025f, { 1, 1, 1 }, LightType::Ambient));
-	scene->lights.push_back(Light({ 0.577, 0.577, -0.577 }, 1, { 1, 0.83, 0.24 }, LightType::Directional));
-	//scene->lights.push_back(Light({ 0, 0.2, 0 }, 1, { 1, 1, 1 }, LightType::Point));
-	//scene->lights.push_back(Light({ 5, 0.2, 0 }, 10, { 0, 1, 0 }, LightType::Point));
-	//scene->lights.push_back(Light({ -5, 0.2, 0 }, 20, { 0, 0, 1 }, LightType::Point));
+	scene->lights.push_back(Light({ 0.577, 0.577, -0.577 }, 1, { 1, 1, 1 }, LightType::Directional));
+	scene->lights.push_back(Light({ 0, 0.2, 0 }, 1, { 1, 1, 1 }, LightType::Point));
+	scene->lights.push_back(Light({ 5, 0.2, 0 }, 10, { 0, 1, 0 }, LightType::Point));
+	scene->lights.push_back(Light({ -5, 0.2, 0 }, 20, { 0, 0, 1 }, LightType::Point));
 
-	for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
-	{
-        scene->lights.push_back(Light({ randomFloat(-8, 8), 0.2f, randomFloat(-5, 5) }, 15, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
-	}
+	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
+	//{
+    //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.2f, randomFloat(-5, 5) }, 15, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
+	//}
 
 	rotationData.resize(scene->lights.size(), glm::vec3(0));
 
     std::cout << "\n\n\nCONTROLS: \n\tMoving: [WASDQE] \n\tLooking: [ARROWS / RMB]\n\n";
+
+    scene->cubemap.Load("resources/textures/circus_arena_4k.hdr");
 }
 
 void Application::Update(float deltaTime)
@@ -87,28 +89,28 @@ void Application::Update(float deltaTime)
 	// x = rotation
 	// y = rotationVelocity
 	// z = time until velocity changes
-	for (int i = 2; i < rotationData.size(); i++)
-	{
-		scene->lights[i].pos += glm::vec3{ sin(rotationData[i].x), 0, cos(rotationData[i].x) } * deltaTime;
-        scene->lights[i].pos *= glm::vec3{ 1 - deltaTime / 10, 0, 1 - deltaTime / 10 };
-		rotationData[i].x += rotationData[i].y * deltaTime;
-		rotationData[i].z -= deltaTime;
-		if (rotationData[i].z <= 0)
-		{
-			rotationData[i].z = randomFloat(0.5, 2.5);
-			rotationData[i].y = randomFloat(-1, 1);
-		}
-	}
+	//for (int i = 2; i < rotationData.size(); i++)
+	//{
+	//	scene->lights[i].pos += glm::vec3{ sin(rotationData[i].x), 0, cos(rotationData[i].x) } * deltaTime;
+ //       scene->lights[i].pos *= glm::vec3{ 1 - deltaTime / 10, 0, 1 - deltaTime / 10 };
+	//	rotationData[i].x += rotationData[i].y * deltaTime;
+	//	rotationData[i].z -= deltaTime;
+	//	if (rotationData[i].z <= 0)
+	//	{
+	//		rotationData[i].z = randomFloat(0.5, 2.5);
+	//		rotationData[i].y = randomFloat(-1, 1);
+	//	}
+	//}
 
-    brightHue += deltaTime * 60;
-    if (brightHue > 360) brightHue -= 360;
+ //   brightHue += deltaTime * 60;
+ //   if (brightHue > 360) brightHue -= 360;
 
-    for (int i = 2; i < rotationData.size(); i++)
-    {
-        glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
-        float brightness = length(mult) * 10;
-        scene->lights[i].intensity = brightness;
-    }
+ //   for (int i = 2; i < rotationData.size(); i++)
+ //   {
+ //       glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
+ //       float brightness = length(mult) * 10;
+ //       scene->lights[i].intensity = brightness;
+ //   }
 }
 
 void Application::Cleanup()

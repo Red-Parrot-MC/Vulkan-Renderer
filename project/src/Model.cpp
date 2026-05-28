@@ -181,7 +181,7 @@ void Model::RecordCommandBuffer(VkCommandBuffer commandBuffer)
 
         vkCmdBindIndexBuffer(commandBuffer, primitives[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->pipelineLayout, 0, 1, &materials[primitives[i]->materialIndex]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->geometryPassPipeline.layout, 0, 1, &materials[primitives[i]->materialIndex]->descriptorSets[CONTEXT->currentFrame], 0, nullptr);
 
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(primitives[i]->indices.size()), 1, 0, 0, 0);
     }

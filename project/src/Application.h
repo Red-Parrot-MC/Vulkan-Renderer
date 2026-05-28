@@ -1,4 +1,5 @@
 #include "BaseApplication.h"
+#include "Cubamap.h"
 
 class Application : public BaseApplication
 {
@@ -21,4 +22,6 @@ private:
 
 	std::vector<glm::vec3> rotationData{};
 	float brightHue{};
+
+	Cubemap cubemap{};
 };

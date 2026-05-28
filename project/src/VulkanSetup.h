@@ -20,10 +20,7 @@ private:
     static void createSwapChain();
     static void createGBuffers();
     static void createImageViews();
-    static void createDescriptorSetLayout();
-    static void createGraphicsPipeline();
-    static void createDepthPrepassPipeline();
-    static void createDeferredPipeline();
+    static void createPipelines();
     static void createCommandPool();
     static void createDepthResources();
     static void createUniformBuffers();
@@ -47,6 +44,4 @@ private:
     static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     static VkFormat findDepthFormat();
     static VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-    static std::vector<char> readFile(const std::string& filename);
-    static VkShaderModule createShaderModule(const std::vector<char>& code);
 };

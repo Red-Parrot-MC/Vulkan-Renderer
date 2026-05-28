@@ -189,3 +189,8 @@ struct LayoutTransitionInfo {
     }
 };
 
+struct Pipeline
+{
+    VkPipeline pipeline{};
+    VkPipelineLayout layout{};
+};

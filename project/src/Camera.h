@@ -7,7 +7,7 @@ class Camera
 {
 public:
 	glm::vec3 origin{ 0, 1, 0 };
-	float fov{ 45.f };
+	float fov{ 60.f };
 	float nearPlane{ 0.1f };
 	float farPlane{ 100.f };
 

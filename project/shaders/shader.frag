@@ -13,7 +13,7 @@ layout(location = 2) in vec4 fragTangent;
 
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec2 outNormal;
-layout(location = 2) out vec4 outMetalic;
+layout(location = 2) out vec2 outMetalic;
 
 vec2 Encode(vec3 n);
 
@@ -41,7 +41,7 @@ void main() {
     outNormal = Encode(normal);
 
     // METALIC + ROUGHNESS
-    outMetalic = texture(metalicRoughnessSampler, fragTexCoord);
+    outMetalic = texture(metalicRoughnessSampler, fragTexCoord).gb;
 }
 
 vec2 Encode(vec3 n) // Octahedron normal vector encoding
