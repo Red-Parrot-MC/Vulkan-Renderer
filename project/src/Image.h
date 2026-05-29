@@ -28,6 +28,8 @@ private:
 	VkFormat format{};
 	uint32_t mipLevels{};
 	VkImageAspectFlags aspectMask{};
+	VkExtent3D extent{};
+	uint32_t arrayLayers{};
 
 public:
 	VkImage getImage() const { return image; }
@@ -36,4 +38,5 @@ public:
 	VkFormat getFormat() const { return format; }
 	uint32_t getMipLevels() const { return mipLevels; }
 	VkImageAspectFlags getAspectMask() const { return aspectMask; }
+	VkExtent3D getExtent() const { return extent; }
 };

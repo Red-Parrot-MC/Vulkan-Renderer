@@ -64,11 +64,11 @@ void Application::Initialize()
     scene->CalculateBounds();
     //std::cout << "Bounding box: (" << scene->getBounds().min.x << ", " << scene->getBounds().min.y << ", " << scene->getBounds().min.z << "), (" << scene->getBounds().max.x << ", " << scene->getBounds().max.y << ", " << scene->getBounds().max.z << ")\n";
 	
-	scene->lights.push_back(Light({ 0, 0, 0 }, 0.025f, { 1, 1, 1 }, LightType::Ambient));
-	scene->lights.push_back(Light({ 0.577, 0.577, -0.577 }, 1, { 1, 1, 1 }, LightType::Directional));
-	scene->lights.push_back(Light({ 0, 0.2, 0 }, 1, { 1, 1, 1 }, LightType::Point));
-	scene->lights.push_back(Light({ 5, 0.2, 0 }, 10, { 0, 1, 0 }, LightType::Point));
-	scene->lights.push_back(Light({ -5, 0.2, 0 }, 20, { 0, 0, 1 }, LightType::Point));
+	//scene->lights.push_back(Light({ 0, 0, 0 }, 0.025f, { 1, 1, 1 }, LightType::Ambient));
+	//scene->lights.push_back(Light({ 0.577, 0.577, -0.577 }, 1, { 1, 1, 1 }, LightType::Directional));
+	//scene->lights.push_back(Light({ 0, 0.2, 0 }, 1, { 1, 1, 1 }, LightType::Point));
+	//scene->lights.push_back(Light({ 5, 0.2, 0 }, 10, { 0, 1, 0 }, LightType::Point));
+	//scene->lights.push_back(Light({ -5, 0.2, 0 }, 20, { 0, 0, 1 }, LightType::Point));
 
 	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
 	//{

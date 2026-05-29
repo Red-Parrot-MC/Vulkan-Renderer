@@ -22,8 +22,8 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 	- [x] Generate environment map
 	- [x] generate mipmaps
 	- [x] render skybox
-	- [ ] generate diffuse irradiance
-	- [ ] use diffuse irradiance
+	- [x] generate diffuse irradiance
+	- [x] use diffuse irradiance
 	
 	- [ ] specular irradiance?
 - [ ] Shadow Mapping

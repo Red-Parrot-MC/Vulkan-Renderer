@@ -26,14 +26,18 @@ Cubemap::~Cubemap()
 void Cubemap::Load(std::string filePath, uint32_t cubemapSize)
 {
     DeletionQueue deletionQueue{};
+    uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(cubemapSize))) + 1;
 
     Image inputImage = LoadInputImage(filePath, deletionQueue);
-    VkDescriptorSetLayout layout = CreateSetLayout(deletionQueue);
-    Pipeline pipeline = CreatePipeline("shaders/cubemap_vert.spv", "shaders/cubemap_frag.spv", layout, deletionQueue);
-    CreateOutputImage(cubemapSize);
-    auto imageViews = CreateImageViews(cubemapSize, deletionQueue);
-    ConvertSphericalToCubemap(inputImage, layout, pipeline, imageViews, cubemapSize, deletionQueue);
+    CreateOutputImage(cubemapImage, cubemapSize, mipLevels);
+    VkSampler sampler = CreateInfoHelpers::CreateSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, &deletionQueue);
+    RenderToCubeMap("shaders/cubemap_vert.spv", "shaders/cubemap_frag.spv", inputImage, sampler, cubemapImage);
     GenerateMipmaps(cubemapSize);
+
+    CreateOutputImage(diffuseIrradianceImage, 64, 1);
+    sampler = CreateInfoHelpers::CreateSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, &deletionQueue);
+    RenderToCubeMap("shaders/cubemap_vert.spv", "shaders/cubemap_diffuse_frag.spv", cubemapImage, sampler, diffuseIrradianceImage);
+    diffuseIrradianceImage.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     deletionQueue.Flush();
 }
@@ -107,7 +111,7 @@ VkDescriptorSetLayout Cubemap::CreateSetLayout(DeletionQueue& deletionQueue)
     return layoutBuilder.Build();
 }
 
-Pipeline Cubemap::CreatePipeline(std::string vertexShader, std::string fragmentShader, VkDescriptorSetLayout layout, DeletionQueue& deletionQueue)
+Pipeline Cubemap::CreatePipeline(std::string vertexShader, std::string fragmentShader, VkDescriptorSetLayout layout, VkFormat colorAttachmentFormat, DeletionQueue& deletionQueue)
 {
     PipelineBuilder builder{};
     builder
@@ -121,7 +125,7 @@ Pipeline Cubemap::CreatePipeline(std::string vertexShader, std::string fragmentS
         .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
         .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
         .AddPushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CubemapPushConstants))
-        .AddColorAttachmentFormat(VK_FORMAT_R32G32B32A32_SFLOAT)
+        .AddColorAttachmentFormat(colorAttachmentFormat)
         .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
         .AddSetLayout(layout)
         .PushDeletionQueue(deletionQueue);
@@ -129,10 +133,8 @@ Pipeline Cubemap::CreatePipeline(std::string vertexShader, std::string fragmentS
     return builder.Build();
 }
 
-void Cubemap::CreateOutputImage(uint32_t size)
+void Cubemap::CreateOutputImage(Image& image, uint32_t size, uint32_t mipLevels)
 {
-    uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
-
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -149,30 +151,11 @@ void Cubemap::CreateOutputImage(uint32_t size)
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    cubemapImage.Create(imageInfo, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_CUBE);
-    
-    //VmaAllocationCreateInfo allocInfo{};
-    //allocInfo.pool = CONTEXT->vmaPool;
-
-    //VmaAllocationInfo vmaAllocationInfo;
-    //VkResult result = vmaCreateImage(CONTEXT->vmaAllocator, &imageInfo, &allocInfo, &cubemapImage, &vmaImageAllocation, &vmaAllocationInfo);
-    //if (result != VK_SUCCESS)
-    //{
-    //    throw std::runtime_error("failed to create image using vma! ");
-    //}
-
-    //VkDebugUtilsObjectNameInfoEXT debugNameInfo{};
-    //debugNameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-    //debugNameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
-    //debugNameInfo.objectHandle = (uint64_t)cubemapImage;
-    //debugNameInfo.pObjectName = "Cubemap";
-    //setDebugUtilsObjectName(CONTEXT->device, &debugNameInfo);
+    image.Create(imageInfo, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_CUBE);
 }
 
-std::array<std::vector<VkImageView>, 6> Cubemap::CreateImageViews(uint32_t size, DeletionQueue& deletionQueue)
+std::array<std::vector<VkImageView>, 6> Cubemap::CreateImageViews(Image image, uint32_t mipLevels, DeletionQueue& deletionQueue)
 {
-    uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
-
     std::array<std::vector<VkImageView>, 6> imageViews{};
 
     for (auto& views : imageViews)
@@ -182,7 +165,7 @@ std::array<std::vector<VkImageView>, 6> Cubemap::CreateImageViews(uint32_t size,
 
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = cubemapImage.getImage();
+    viewInfo.image = image.getImage();
     viewInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.subresourceRange.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
@@ -306,7 +289,6 @@ void Cubemap::ConvertSphericalToCubemap(Image inputImage, VkDescriptorSetLayout 
     subresourceRange.baseArrayLayer = 0;
     subresourceRange.layerCount = 6;
 
-    //ImageHelpers::transitionImageLayout(cubemapImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
     cubemapImage.TransitionLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
 
     // COMMAND BUFFER
@@ -344,26 +326,120 @@ void Cubemap::GenerateMipmaps(uint32_t cubemapSize)
     subresourceRange.layerCount = 6;
     subresourceRange.baseArrayLayer = 0;
 
-    //ImageHelpers::transitionImageLayout(cubemapImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
     cubemapImage.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
     ImageHelpers::generateMipmaps(cubemapImage.getImage(), VK_FORMAT_R32G32B32A32_SFLOAT, cubemapSize, cubemapSize, mipLevels, subresourceRange);
 }
 
-void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShader, VkImage inputImage, VkImageView inputImageView, VkSampler inputSampler, VkImage& outputCubemapImage)
+void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShader, Image inputImage, VkSampler inputSampler, Image& outputCubemapImage)
 {
     DeletionQueue deletionQueue{};
 
     VkDescriptorSetLayout setLayout = CreateSetLayout(deletionQueue);
-    Pipeline pipeline = CreatePipeline(vertexShader, fragmentShader, setLayout, deletionQueue);
+    Pipeline pipeline = CreatePipeline(vertexShader, fragmentShader, setLayout, inputImage.getFormat(), deletionQueue);
+    auto imageViews = CreateImageViews(outputCubemapImage, outputCubemapImage.getMipLevels(), deletionQueue);
 
-    Image image{};
-    
+    glm::vec3 eye = glm::vec3(0.0f); // Center of cube position
+    glm::mat4 captureViews[6] = {
+        glm::lookAt(eye, eye + glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)), // +X
+        glm::lookAt(eye, eye + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)), // -X
+        glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)), // -Y
+        glm::lookAt(eye, eye + glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)), // +Y
+        glm::lookAt(eye, eye + glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)), // +Z
+        glm::lookAt(eye, eye + glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f)), // -Z
+    };
+
+    glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    captureProj[1][1] *= -1.0f; // Inverted Y-axis for mathing face orientation
+
+    VkViewport viewport{};
+    viewport.width = outputCubemapImage.getExtent().width;
+    viewport.height = outputCubemapImage.getExtent().height;
+    viewport.minDepth = 0;
+    viewport.maxDepth = 1;
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = { outputCubemapImage.getExtent().width, outputCubemapImage.getExtent().height };
+
+    VkRenderingAttachmentInfo cubemapAttachment{};
+    cubemapAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    cubemapAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    cubemapAttachment.imageView = imageViews[0][0];
+
+    inputImage.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, scissor.extent };
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &cubemapAttachment;
+    renderInfo.pDepthAttachment = nullptr;
+    renderInfo.pStencilAttachment = nullptr;
+
+    VkSamplerCreateInfo samplerCreateInfo = CreateInfoHelpers::GetSamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageView = inputImage.getView();
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo samplerInfo{};
+    samplerInfo.sampler = inputSampler;
+
+    DescriptorSetBuilder builder{};
+    VkDescriptorSet descriptorSet = builder
+        .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, &imageInfo)
+        .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, &samplerInfo)
+        .Build(setLayout)[0];
+
+    std::vector<VkRenderingAttachmentInfo> cubemapAttachments{ 6 };
+    std::vector<VkRenderingInfo> renderInfos{ 6 };
+
+    for (uint32_t i = 0; i < 6; i++)
+    {
+        cubemapAttachment.imageView = imageViews[i][0];
+        cubemapAttachments[i] = cubemapAttachment;
+
+        renderInfo.pColorAttachments = &cubemapAttachments[i];
+        renderInfos[i] = renderInfo;
+    }
+
+    VkImageSubresourceRange subresourceRange{};
+    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresourceRange.baseMipLevel = 0;
+    subresourceRange.levelCount = outputCubemapImage.getMipLevels();
+    subresourceRange.baseArrayLayer = 0;
+    subresourceRange.layerCount = 6;
+
+    outputCubemapImage.TransitionLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
+
+    // COMMAND BUFFER
+    VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+    {
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptorSet, 0, nullptr);
+
+        for (uint32_t i = 0; i < 6; i++)
+        {
+            vkCmdBeginRendering(cmd, &renderInfos[i]);
+            {
+                CubemapPushConstants pushConstants{ captureProj, captureViews[i] };
+                vkCmdPushConstants(cmd, pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CubemapPushConstants), &pushConstants);
+                vkCmdDraw(cmd, 36, 1, 0, 0);
+            }
+            vkCmdEndRendering(cmd);
+        }
+    }
+    BufferHelpers::endSingleTimeCommands(cmd);
+
+    deletionQueue.Flush();
 }
 
 
 void Cubemap::Destroy()
 {
     cubemapImage.Destroy();
-    vmaDestroyImage(CONTEXT->vmaAllocator, diffuseIrradianceImage, vmaDiffuseIrradianceAllocation);
-    vkDestroyImageView(CONTEXT->device, diffuseIrradianceView, nullptr);
+    diffuseIrradianceImage.Destroy();
 }

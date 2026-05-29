@@ -44,6 +44,8 @@ void Image::Create(const VkImageCreateInfo& createInfo, VkImageAspectFlags aspec
     layout = createInfo.initialLayout;
     format = createInfo.format;
     mipLevels = createInfo.mipLevels;
+    extent = createInfo.extent;
+    arrayLayers = createInfo.arrayLayers;
     this->aspectMask = aspectMask;
 
     VkImageSubresourceRange subResourceRange{};
@@ -91,22 +93,30 @@ void Image::DestroyConst() const
 
 void Image::TransitionLayout(VkImageLayout newLayout)
 {
-    ImageHelpers::transitionImageLayout(image, layout, newLayout, mipLevels, aspectMask);
+    VkImageSubresourceRange subResourceRange{};
+    subResourceRange.aspectMask = aspectMask;
+    subResourceRange.layerCount = arrayLayers;
+    subResourceRange.levelCount = mipLevels;
+
+    TransitionLayout(newLayout, subResourceRange);
 }
 
 void Image::TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout)
 {
-    ImageHelpers::transitionImageLayout(commandBuffer, image, layout, newLayout, aspectMask, mipLevels);
+    VkImageSubresourceRange subResourceRange{};
+    subResourceRange.aspectMask = aspectMask;
+    subResourceRange.layerCount = arrayLayers;
+    subResourceRange.levelCount = mipLevels;
+
+    TransitionLayout(commandBuffer, newLayout, subResourceRange);
 }
 
 void Image::TransitionLayout(VkImageLayout newLayout, VkImageSubresourceRange subResourceRange)
 {
-    subResourceRange.aspectMask = aspectMask;
     ImageHelpers::transitionImageLayout(image, layout, newLayout, subResourceRange);
 }
 
 void Image::TransitionLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout, VkImageSubresourceRange subResourceRange)
 {
-    subResourceRange.aspectMask = aspectMask;
     ImageHelpers::transitionImageLayout(commandBuffer, image, layout, newLayout, subResourceRange);
 }

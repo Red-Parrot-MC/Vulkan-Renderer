@@ -31,4 +31,23 @@ public:
 
         return samplerInfo;
     }
+
+    static VkSampler CreateSampler(VkFilter filter, VkSamplerAddressMode addressMode, DeletionQueue* deletionQueue = nullptr)
+    {
+        auto createInfo = GetSamplerCreateInfo(filter, addressMode);
+        VkSampler sampler{};
+        vkCreateSampler(CONTEXT->device, &createInfo, nullptr, &sampler);
+
+        if (deletionQueue)
+        {
+            deletionQueue->PushDeletor(
+                [sampler]()
+                {
+                    vkDestroySampler(CONTEXT->device, sampler, nullptr);
+                }
+            );
+        }
+
+        return sampler;
+    }
 };

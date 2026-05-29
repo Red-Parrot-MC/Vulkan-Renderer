@@ -285,6 +285,10 @@ private:
         cubemapImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         cubemapImageInfo.imageView = scene->cubemap.cubemapImage.getView();
 
+        VkDescriptorImageInfo diffuseIrradianceImageInfo{};
+        diffuseIrradianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        diffuseIrradianceImageInfo.imageView = scene->cubemap.diffuseIrradianceImage.getView();
+
         VkDescriptorBufferInfo lightBufferInfo{};
         lightBufferInfo.offset = 0;
         lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
@@ -294,9 +298,10 @@ private:
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
             .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
-            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
+            .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 4;
+        uint32_t index = 5;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {

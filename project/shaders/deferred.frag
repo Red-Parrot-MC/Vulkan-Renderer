@@ -32,6 +32,8 @@ float DistributionGGX(vec3 N, vec3 H, float roughness);
 float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
 vec3 fresnelSchlick(float cosTheta, vec3 F0);
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness);
+vec3 SampleIBL_Diffuse(in vec3 normalWS, in float environmentIntensity);
 
 // ------------ BINDINGS -----------------
 layout(binding = 0) uniform UniformBufferObject {
@@ -50,12 +52,17 @@ layout(binding = 1) uniform LightBufferObject {
 } lightBuffer;
 
 layout(binding = 2) uniform samplerCube cubeSampler;
-layout(binding = 3) uniform sampler2D depthSampler;
-layout(binding = 4) uniform sampler2D colorSampler;
-layout(binding = 5) uniform sampler2D normalSampler;
-layout(binding = 6) uniform sampler2D metallicSampler;
+layout(binding = 3) uniform samplerCube diffuseIrradianceSampler;
+layout(binding = 4) uniform sampler2D depthSampler;
+layout(binding = 5) uniform sampler2D colorSampler;
+layout(binding = 6) uniform sampler2D normalSampler;
+layout(binding = 7) uniform sampler2D metallicSampler;
 
 layout(location = 0) out vec4 outColor;
+
+// ------------ CONSTANTS -----------------
+const float environmentIntensity = 1;
+const float exposureCompensation = 1;
 
 // ------------ CODE -----------------
 void main()
@@ -135,11 +142,21 @@ void main()
         Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL;
     }
 
-    vec3 color = Lo;
-	
-    color = color / (color + vec3(1.0));
+    // Calculate diffuse and specular terms based on roughness
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.f), F0, metallic.r);
+    vec3 kS = F;
+    vec3 kD = 1.f - kS;
+    kD *= 1.f - metallic.g;
 
-    outColor = vec4(color, 1);
+    // Calculate ambient diffuse lighting
+    const vec3 prefilteredDiffuseIrradiance = SampleIBL_Diffuse(N, environmentIntensity);
+    const vec3 diffuse = prefilteredDiffuseIrradiance * albedo.rgb;
+
+    // Finalize color
+    vec3 ambient = kD * diffuse * exposureCompensation;
+    vec3 finalColor = ambient + Lo;
+
+    outColor = vec4(finalColor, 1);
 }
 
 
@@ -229,3 +246,17 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 } 
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}  
+
+vec3 SampleIBL_Diffuse(in vec3 normalWS, in float environmentIntensity)
+{
+    const vec3 prefilteredDiffuseIrradiance = texture(
+    diffuseIrradianceSampler,
+    normalWS).rgb;
+    const vec3 exposedPrefilteredDiffuseIrradiance = prefilteredDiffuseIrradiance * environmentIntensity;
+    return exposedPrefilteredDiffuseIrradiance;
+}
