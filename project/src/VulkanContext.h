@@ -38,7 +38,7 @@ public:
     Pipeline geometryPassPipeline{};
     Pipeline depthPassPipeline{};
     Pipeline lightingPassPipeline{};
-    VkDescriptorSetLayout deferredDescriptorSetLayout{};
+    VkDescriptorSetLayout lightingPassDescriptorSetLayout{};
 
     VkCommandPool commandPool{};
     std::vector<VkCommandBuffer> commandBuffers{};

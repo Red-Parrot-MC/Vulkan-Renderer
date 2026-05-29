@@ -434,6 +434,7 @@ void VulkanSetup::createPipelines()
         );
     }
 
+
     // ---------- GEOMETRY PASS ----------
     {
         DescriptorSetLayoutBuilder setLayoutBuilder{};
@@ -448,8 +449,8 @@ void VulkanSetup::createPipelines()
 
         PipelineBuilder gBufferPipelineBuilder{};
         gBufferPipelineBuilder
-            .AddShader("shaders/shader_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
-            .AddShader("shaders/shader_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+            .AddShader("shaders/geometry_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+            .AddShader("shaders/geometry_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
             .AddBindingDescription(Vertex::getBindingDescription())
             .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
             .SetViewportState(1, 1)
@@ -501,7 +502,7 @@ void VulkanSetup::createPipelines()
     }
 
 
-    // ---------- LIGHTING PASS ----------
+    // ---------- SHADING PASS ----------
     {
         DescriptorSetLayoutBuilder deferredSetLayoutBuilder{};
         deferredSetLayoutBuilder
@@ -516,13 +517,13 @@ void VulkanSetup::createPipelines()
         for (gBuffer* g : CONTEXT->gBuffers)
             deferredSetLayoutBuilder.AddBinding(index++, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // gBuffer
         
-        CONTEXT->deferredDescriptorSetLayout = deferredSetLayoutBuilder.Build();
+        CONTEXT->lightingPassDescriptorSetLayout = deferredSetLayoutBuilder.Build();
 
 
         PipelineBuilder deferredPipelineBuilder{};
         CONTEXT->lightingPassPipeline = deferredPipelineBuilder
-            .AddShader("shaders/deferred_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
-            .AddShader("shaders/deferred_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
+            .AddShader("shaders/lighting_vert.spv", VK_SHADER_STAGE_VERTEX_BIT)
+            .AddShader("shaders/lighting_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
             .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE)
             .SetViewportState(1, 1)
             .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
@@ -530,7 +531,7 @@ void VulkanSetup::createPipelines()
             .AddColorBlendAttachment(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE)
             .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
             .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
-            .AddSetLayout(CONTEXT->deferredDescriptorSetLayout)
+            .AddSetLayout(CONTEXT->lightingPassDescriptorSetLayout)
             .SetDepthStencil(VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
             .SetDepthFormat(PipelineBuilder::findDepthFormat())
             .AddColorAttachmentFormat(CONTEXT->swapChainImageFormat)

@@ -115,7 +115,6 @@ private:
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(CONTEXT->device, CONTEXT->swapChain, UINT64_MAX, CONTEXT->imageAvailableSemaphores[CONTEXT->currentFrame], VK_NULL_HANDLE, &imageIndex);
-        //std::cout << CONTEXT->currentFrame << ", " << imageIndex << "\n";
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || CONTEXT->framebufferResized) {
             CONTEXT->framebufferResized = false;
@@ -141,14 +140,12 @@ private:
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
         presentInfo.waitSemaphoreCount = 1;
         presentInfo.pWaitSemaphores = signalSemaphores;
 
         VkSwapchainKHR swapChains[] = { CONTEXT->swapChain };
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
-
         presentInfo.pImageIndices = &imageIndex;
 
         result = vkQueuePresentKHR(CONTEXT->presentQueue, &presentInfo);
@@ -201,19 +198,19 @@ private:
         depthPassDepthAttachment.imageView = CONTEXT->depthImage.getView();
         depthPassDepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depthPassDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthPassDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthPassDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         depthPassDepthAttachment.clearValue = { 1.0f, 0 };
 
-        VkRenderingAttachmentInfo mainDepthAttachment = {};
-        mainDepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        mainDepthAttachment.imageView = CONTEXT->depthImage.getView();
-        mainDepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        mainDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        mainDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        mainDepthAttachment.clearValue = { 1.0f, 0 };
+        VkRenderingAttachmentInfo geometryPassDepthAttachment = {};
+        geometryPassDepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        geometryPassDepthAttachment.imageView = CONTEXT->depthImage.getView();
+        geometryPassDepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        geometryPassDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        geometryPassDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        geometryPassDepthAttachment.clearValue = { 1.0f, 0 };
 
-        std::vector<VkRenderingAttachmentInfo> colorAttachments{};
-        std::vector<VkRenderingAttachmentInfo> deferredColorAttachments{ colorAttachment };
+        std::vector<VkRenderingAttachmentInfo> geometryColorAttachments{};
+        std::vector<VkRenderingAttachmentInfo> lightingColorAttachments{ colorAttachment };
 
         for (gBuffer* b : CONTEXT->gBuffers)
         {
@@ -225,7 +222,7 @@ private:
             bufferAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             bufferAttachment.clearValue = b->clearValue;
 
-            colorAttachments.push_back(bufferAttachment);
+            geometryColorAttachments.push_back(bufferAttachment);
         }
 
         int width, height;
@@ -250,23 +247,23 @@ private:
         depthRenderInfo.pDepthAttachment = &depthPassDepthAttachment;
         depthRenderInfo.pStencilAttachment = nullptr;
 
-        VkRenderingInfo mainRenderInfo{};
-        mainRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        mainRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
-        mainRenderInfo.layerCount = 1;
-        mainRenderInfo.colorAttachmentCount = colorAttachments.size();
-        mainRenderInfo.pColorAttachments = colorAttachments.data();
-        mainRenderInfo.pDepthAttachment = &mainDepthAttachment;
-        mainRenderInfo.pStencilAttachment = nullptr;
+        VkRenderingInfo geometryRenderInfo{};
+        geometryRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        geometryRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        geometryRenderInfo.layerCount = 1;
+        geometryRenderInfo.colorAttachmentCount = geometryColorAttachments.size();
+        geometryRenderInfo.pColorAttachments = geometryColorAttachments.data();
+        geometryRenderInfo.pDepthAttachment = &geometryPassDepthAttachment;
+        geometryRenderInfo.pStencilAttachment = nullptr;
 
-        VkRenderingInfo deferredRenderInfo{};
-        deferredRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        deferredRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
-        deferredRenderInfo.layerCount = 1;
-        deferredRenderInfo.colorAttachmentCount = deferredColorAttachments.size();
-        deferredRenderInfo.pColorAttachments = deferredColorAttachments.data();
-        deferredRenderInfo.pDepthAttachment = nullptr;
-        deferredRenderInfo.pStencilAttachment = nullptr;
+        VkRenderingInfo lightingRenderInfo{};
+        lightingRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        lightingRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
+        lightingRenderInfo.layerCount = 1;
+        lightingRenderInfo.colorAttachmentCount = lightingColorAttachments.size();
+        lightingRenderInfo.pColorAttachments = lightingColorAttachments.data();
+        lightingRenderInfo.pDepthAttachment = nullptr;
+        lightingRenderInfo.pStencilAttachment = nullptr;
 
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.offset = 0;
@@ -293,8 +290,8 @@ private:
         lightBufferInfo.offset = 0;
         lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
 
-        DescriptorSetBuilder deferredDescriptorSetBuilder{};
-        deferredDescriptorSetBuilder
+        DescriptorSetBuilder lightingDescriptorSetBuilder{};
+        lightingDescriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
             .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
@@ -311,11 +308,11 @@ private:
 
             imageInfos.push_back(imageInfo);
 
-            deferredDescriptorSetBuilder.AddWrite(index, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, imageInfo);
+            lightingDescriptorSetBuilder.AddWrite(index, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, imageInfo);
             index++;
         }
 
-        VkDescriptorSet deferredDescriptorSet = deferredDescriptorSetBuilder.Build(CONTEXT->deferredDescriptorSetLayout)[imageIndex];
+        VkDescriptorSet lightingDescriptorSet = lightingDescriptorSetBuilder.Build(CONTEXT->lightingPassDescriptorSetLayout)[imageIndex];
 
         for (auto i : imageInfos)
             delete i;
@@ -354,7 +351,7 @@ private:
 
         vkCmdEndRendering(commandBuffer);
 
-        vkCmdBeginRendering(commandBuffer, &mainRenderInfo);
+        vkCmdBeginRendering(commandBuffer, &geometryRenderInfo);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->geometryPassPipeline.pipeline);
 
         for (auto model : scene->models)
@@ -377,8 +374,8 @@ private:
         }
         CONTEXT->depthImage.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
-        vkCmdBeginRendering(commandBuffer, &deferredRenderInfo);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.layout, 0, 1, &deferredDescriptorSet, 0, nullptr);
+        vkCmdBeginRendering(commandBuffer, &lightingRenderInfo);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.layout, 0, 1, &lightingDescriptorSet, 0, nullptr);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.pipeline);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
@@ -468,12 +465,6 @@ private:
         ubo.invView = glm::inverse(ubo.view);
 
         memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-
-        //VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
-        //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->deferredPipeline);
-        //vkCmdPushConstants(cmd, CONTEXT->deferredPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Light) * CONTEXT->MAX_LIGHTS, scene->lights.data());
-        //BufferHelpers::endSingleTimeCommands(cmd);
-
         memcpy(CONTEXT->lightBuffersMapped[currentImage], scene->lights.data(), sizeof(Light) * std::min(CONTEXT->MAX_LIGHTS, static_cast<uint32_t>(scene->lights.size())));
     }
 
