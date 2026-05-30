@@ -18,6 +18,16 @@ struct Light
     uint type;
 };
 
+struct ShadowLight
+{
+    vec3 direction;
+    float intensity;
+    vec3 color;
+    uint layerIndex;
+    mat4 view;
+    mat4 proj;
+};
+
 struct PointLight
 {
     vec3 pos;
@@ -51,12 +61,19 @@ layout(binding = 1) uniform LightBufferObject {
     Light lights[lightCount];
 } lightBuffer;
 
-layout(binding = 2) uniform samplerCube cubeSampler;
-layout(binding = 3) uniform samplerCube diffuseIrradianceSampler;
-layout(binding = 4) uniform sampler2D depthSampler;
-layout(binding = 5) uniform sampler2D colorSampler;
-layout(binding = 6) uniform sampler2D normalSampler;
-layout(binding = 7) uniform sampler2D metallicSampler;
+const int shadowLightCount = 100;
+layout(binding = 2) uniform ShadowLightBufferObject {
+    ShadowLight shadowLights[shadowLightCount];
+} shadowLightBuffer;
+
+layout(binding = 3) uniform sampler2DArrayShadow shadowMapsSampler;
+layout(binding = 4) uniform samplerCube cubeSampler;
+layout(binding = 5) uniform samplerCube diffuseIrradianceSampler;
+layout(binding = 6) uniform sampler2D depthSampler;
+layout(binding = 7) uniform sampler2D colorSampler;
+layout(binding = 8) uniform sampler2D normalSampler;
+layout(binding = 9) uniform sampler2D metallicSampler;
+layout(binding = 10) uniform sampler2D geometricNormalSampler;
 
 layout(location = 0) out vec4 outColor;
 
@@ -67,7 +84,7 @@ const float exposureCompensation = 1;
 // ------------ CODE -----------------
 void main()
 {
-	ivec2 pos = ivec2(gl_FragCoord.xy);
+	const ivec2 pos = ivec2(gl_FragCoord.xy);
 	float sampledDepth = texelFetch(depthSampler, pos, 0).r;
     const vec3 worldPosition = GetWorldPositionFromDepth(sampledDepth, 
         pos, ubo.resolution, 
@@ -111,7 +128,7 @@ void main()
         }
         if (lightBuffer.lights[i].type == DirectionalLightType)
         {
-            L = lightBuffer.lights[i].pos;
+            L = -lightBuffer.lights[i].pos;
             if (dot(N, L) < 0) continue;
 
             irradiance = lightBuffer.lights[i].color * lightBuffer.lights[i].intensity;
@@ -140,6 +157,46 @@ void main()
             
         // add to outgoing radiance Lo              
         Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL;
+    }
+
+    for (int i = 0; i < shadowLightCount; i++)
+    {
+        if (shadowLightBuffer.shadowLights[i].direction == vec3(0)) break;
+        const ShadowLight light = shadowLightBuffer.shadowLights[i];
+
+        vec3 L = -light.direction;
+        //if (dot(N, L) < 0) continue;
+        vec3 irradiance = light.color * light.intensity;
+
+        // Get UV coordinate in shadow map
+        vec4 LightSpacePosition = light.proj * light.view * vec4(worldPosition, 1.f);
+        LightSpacePosition /= LightSpacePosition.w;
+        vec3 shadowMapUV = vec3(LightSpacePosition.xy * 0.5f + 0.5f,
+        LightSpacePosition.z);
+
+        // Manual compare - point sampling or nearest filtering required!
+        float shadowTerm = texture(shadowMapsSampler, vec4(shadowMapUV.xy, light.layerIndex, shadowMapUV.z)).r;
+        vec3 geometricNormal = Decode(texelFetch(geometricNormalSampler, pos, 0).rg);
+        float NdotL = max(dot(geometricNormal, L), 0.0);  
+        shadowTerm *= smoothstep(0, 0.2, NdotL);
+
+        vec3 H = normalize(V + L);
+
+        // cook-torrance brdf
+        float NDF = DistributionGGX(N, H, metallic.r);        
+        float G   = GeometrySmith(N, V, L, metallic.r);      
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+        
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic.g;
+        
+        vec3 numerator    = NDF * G * F;   
+        float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+        vec3 specular     = numerator / denominator;  
+            
+        // add to outgoing radiance Lo              
+        Lo = (kD * albedo.rgb / PI + specular) * irradiance * NdotL * shadowTerm;
     }
 
     // Calculate diffuse and specular terms based on roughness

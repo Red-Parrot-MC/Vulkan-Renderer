@@ -15,6 +15,7 @@ private:
 
 	// Methods
 	void UpdateCamera(float deltaTime);
+	void AddShadowLight(float pitch, float yaw, float intensity, glm::vec3 color);
 
 	// Members
 	double m_cursorX{};
@@ -23,5 +24,6 @@ private:
 	std::vector<glm::vec3> rotationData{};
 	float brightHue{};
 
-	Cubemap cubemap{};
+	//DirectionalShadowLight* shadowLight{};
+	std::vector<DirectionalShadowLight*> shadowLights{};
 };

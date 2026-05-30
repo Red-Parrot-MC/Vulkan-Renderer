@@ -1,8 +1,8 @@
 #pragma once
-#include "Model.h"
 #include <string>
 #include <unordered_map>
 #include "Cubamap.h"
+#include "DirectionalShadowLight.h"
 
 struct tg3_model;
 struct tg3_primitive;
@@ -20,10 +20,12 @@ public:
 
 	std::vector<Model*> models{};
 	std::vector<Light> lights{};
+	std::vector<DirectionalShadowLightBufferObject*> directionalShadowLights{};
 	Cubemap cubemap{};
 
 	void CalculateBounds();
-	BoundingBox getBounds() { return boundingBox; }
+	BoundingBox getBounds() const { return boundingBox; }
+
 private:
 	void LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg3Primitive, const tg3_node& node, Model* model, std::unordered_map<uint32_t, uint32_t>& loadedMaterials, std::string baseUri);
 	Material* createDefaultTextures();

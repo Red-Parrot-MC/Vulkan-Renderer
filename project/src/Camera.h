@@ -24,12 +24,8 @@ public:
 		calculateDirections();
 	}
 
-	void ApplyDefaultMovement(float deltaTime)
+	void ApplyDefaultMovement(float deltaTime, float moveSpeed = 5, float rotateSpeed = 1, float mouseSensitivity = 0.4f)
 	{
-		float moveSpeed{ 5 };
-		float rotateSpeed{ 1 };
-		float mouseSensitivity{ 0.4f };
-
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_LEFT_SHIFT)) moveSpeed *= 2;
 
 		if (glfwGetKey(CONTEXT->window, GLFW_KEY_W)) origin += forward * moveSpeed * deltaTime;

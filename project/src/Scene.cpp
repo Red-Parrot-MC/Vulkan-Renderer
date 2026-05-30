@@ -142,8 +142,10 @@ bool Scene::LoadGLTF(std::string filename)
     uint32_t primitivesLoaded{ 0 };
 
     // calculate model size
-    for (uint32_t meshIndex = 0; meshIndex < tg3Model->meshes_count; meshIndex++)
+    for (uint32_t nodeIndex = 0; nodeIndex < tg3Model->nodes_count; nodeIndex++)
     {
+        const tg3_node& node = tg3Model->nodes[nodeIndex];
+        int32_t meshIndex = node.mesh;
         tg3_mesh mesh = tg3Model->meshes[meshIndex];
         primitivesCount += mesh.primitives_count;
     }
@@ -295,7 +297,6 @@ void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg
 
     if (normals.size() < positions.size())
     {
-        std::cout << "\nCalculating normals\n";
         normals.resize(positions.size(), glm::vec3(0));
 
         // generate normals
@@ -328,7 +329,6 @@ void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg
         if (texcoords.size() >= positions.size())
         {
             // generate tangents
-            std::cout << "\nGenerating tangents\n";
             for (uint32_t i = 0; i < primitive->indices.size(); i += 3)
             {
                 uint32_t i0 = primitive->indices[i + 0];
@@ -480,8 +480,8 @@ void Scene::CalculateBounds()
         if (model->boundingBox.min == model->boundingBox.max)
             model->CalculateBounds();
 
-        glm::vec3 min = glm::vec4{ model->boundingBox.min, 1 } * model->modelMatrix;
-        glm::vec3 max = glm::vec4{ model->boundingBox.max, 1 } * model->modelMatrix;
+        glm::vec3 min = glm::vec4{ model->boundingBox.min, 1 }/* * model->modelMatrix*/;
+        glm::vec3 max = glm::vec4{ model->boundingBox.max, 1 }/* * model->modelMatrix*/;
         boundingBox.min = glm::min(boundingBox.min, min);
         boundingBox.min = glm::min(boundingBox.min, max);
         boundingBox.max = glm::max(boundingBox.max, min);

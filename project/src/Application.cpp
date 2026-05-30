@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "DirectionalShadowLight.h"
 
 float randomFloat(float min, float max)
 {
@@ -59,20 +60,32 @@ glm::vec3 hsv2rgb(glm::vec3 in)
 
 void Application::Initialize()
 {
-	scene->LoadGLTF("resources/sponza/Sponza.gltf");
-	scene->LoadGLTF("resources/Cactus/Cactus.gltf");
+	//scene->LoadGLTF("resources/sponza/Sponza.gltf");
+	//scene->LoadGLTF("resources/Cactus/Cactus.gltf");
+    scene->LoadGLTF("resources/ABeautifulGame/ABeautifulGame.gltf");
     scene->CalculateBounds();
-    //std::cout << "Bounding box: (" << scene->getBounds().min.x << ", " << scene->getBounds().min.y << ", " << scene->getBounds().min.z << "), (" << scene->getBounds().max.x << ", " << scene->getBounds().max.y << ", " << scene->getBounds().max.z << ")\n";
-	
-	//scene->lights.push_back(Light({ 0, 0, 0 }, 0.025f, { 1, 1, 1 }, LightType::Ambient));
-	//scene->lights.push_back(Light({ 0.577, 0.577, -0.577 }, 1, { 1, 1, 1 }, LightType::Directional));
-	//scene->lights.push_back(Light({ 0, 0.2, 0 }, 1, { 1, 1, 1 }, LightType::Point));
-	//scene->lights.push_back(Light({ 5, 0.2, 0 }, 10, { 0, 1, 0 }, LightType::Point));
-	//scene->lights.push_back(Light({ -5, 0.2, 0 }, 20, { 0, 0, 1 }, LightType::Point));
+    camera.nearPlane = 0.01f;
+
+    float pitch = -45;
+    float yaw = -90;
+    float size = 5;
+    float stepSize = 1.f;
+
+    //float s = size / 2;
+    //for (float p = pitch - s; p < pitch + s; p += stepSize)
+    //{
+    //    for (float y = yaw - s; y < yaw + s; y += stepSize)
+    //    {
+    //        AddShadowLight(p, y, 0.4f, { 0.5, 0.5, 1 });
+    //    }
+    //}
+
+
+    AddShadowLight(pitch, yaw, 5, { 1, 1, 1 });
 
 	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
 	//{
-    //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.2f, randomFloat(-5, 5) }, 15, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
+ //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.2f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
 	//}
 
 	rotationData.resize(scene->lights.size(), glm::vec3(0));
@@ -86,39 +99,62 @@ void Application::Update(float deltaTime)
 {
 	UpdateCamera(deltaTime);
 
+    //for (auto light : shadowLights)
+    //    light->UpdateDepthMap(*scene);
+
 	// x = rotation
 	// y = rotationVelocity
 	// z = time until velocity changes
-	//for (int i = 2; i < rotationData.size(); i++)
-	//{
-	//	scene->lights[i].pos += glm::vec3{ sin(rotationData[i].x), 0, cos(rotationData[i].x) } * deltaTime;
- //       scene->lights[i].pos *= glm::vec3{ 1 - deltaTime / 10, 0, 1 - deltaTime / 10 };
-	//	rotationData[i].x += rotationData[i].y * deltaTime;
-	//	rotationData[i].z -= deltaTime;
-	//	if (rotationData[i].z <= 0)
-	//	{
-	//		rotationData[i].z = randomFloat(0.5, 2.5);
-	//		rotationData[i].y = randomFloat(-1, 1);
-	//	}
-	//}
+	for (int i = 0; i < rotationData.size(); i++)
+	{
+		scene->lights[i].pos += glm::vec3{ sin(rotationData[i].x), 0, cos(rotationData[i].x) } * deltaTime;
+        scene->lights[i].pos *= glm::vec3{ 1 - deltaTime / 10, 0, 1 - deltaTime / 10 };
+		rotationData[i].x += rotationData[i].y * deltaTime;
+		rotationData[i].z -= deltaTime;
+		if (rotationData[i].z <= 0)
+		{
+			rotationData[i].z = randomFloat(0.5, 2.5);
+			rotationData[i].y = randomFloat(-1, 1);
+		}
+	}
 
- //   brightHue += deltaTime * 60;
- //   if (brightHue > 360) brightHue -= 360;
+    brightHue += deltaTime * 60;
+    if (brightHue > 360) brightHue -= 360;
 
- //   for (int i = 2; i < rotationData.size(); i++)
- //   {
- //       glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
- //       float brightness = length(mult) * 10;
- //       scene->lights[i].intensity = brightness;
- //   }
+    for (int i = 0; i < rotationData.size(); i++)
+    {
+        glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
+        float brightness = length(mult) * 10;
+        scene->lights[i].intensity = brightness;
+    }
 }
 
 void Application::Cleanup()
 {
-
+    for (auto light : shadowLights)
+    {
+        light->Destroy();
+        delete light;
+    }
+    shadowLights.clear();
 }
 
 void Application::UpdateCamera(float deltaTime)
 {
-	camera.ApplyDefaultMovement(deltaTime);
+	camera.ApplyDefaultMovement(deltaTime, 0.5f);
+}
+
+void Application::AddShadowLight(float pitch, float yaw, float intensity, glm::vec3 color)
+{
+    pitch = pitch / 180 * PI;
+    yaw = yaw / 180 * PI;
+
+    glm::vec3 forward{};
+    forward.x = cos(pitch) * cos(yaw);
+    forward.y = sin(pitch);
+    forward.z = cos(pitch) * sin(yaw);
+    forward = glm::normalize(forward);
+
+    shadowLights.push_back(new DirectionalShadowLight{ Light(forward, intensity, color, LightType::Directional), *scene });
+    scene->directionalShadowLights.push_back(shadowLights.back()->GetBufferObject());
 }

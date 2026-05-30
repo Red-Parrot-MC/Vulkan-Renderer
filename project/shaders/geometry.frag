@@ -14,6 +14,7 @@ layout(location = 2) in vec4 fragTangent;
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec2 outNormal;
 layout(location = 2) out vec2 outMetalic;
+layout(location = 3) out vec2 outGeometricNormal;
 
 vec2 Encode(vec3 n);
 
@@ -24,6 +25,7 @@ void main() {
 
     // NORMAL
     vec3 normal = normalize(fragNormal);
+    outGeometricNormal = Encode(normal);
     vec3 tangent = normalize(fragTangent.xyz);
     if (tangent.length() > 0.5)
     {

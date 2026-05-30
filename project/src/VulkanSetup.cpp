@@ -12,6 +12,7 @@
 #include "Model.h"
 #include "DescriptorSetLayoutBuilder.h"
 #include "CreateInfoHelpers.h"
+#include "DirectionalShadowLight.h"
 
 const int MAX_MODELS = 200;
 
@@ -389,6 +390,9 @@ void VulkanSetup::createGBuffers()
     // metalic roughness
     CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R8G8_UNORM, clearValue, "gBuffer Metalic"));
 
+    // geometric normals
+    CONTEXT->gBuffers.push_back(ImageHelpers::createGBuffer(VK_FORMAT_R32G32_SFLOAT, clearValue, "gBuffer Geometric Normal"));
+
     CONTEXT->resizeDeletionQueue.PushDeletor(
         []()
         {
@@ -422,14 +426,21 @@ void VulkanSetup::createPipelines()
 {
     // ---------- SAMPLER ----------
     VkSampler sampler{};
+    VkSampler shadowSampler{};
     {
         auto samplerInfo = CreateInfoHelpers::GetSamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT);
         vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler);
+        
+        auto shadowSamplerInfo = CreateInfoHelpers::GetSamplerCreateInfo(VK_FILTER_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);
+        shadowSamplerInfo.compareOp = VK_COMPARE_OP_LESS;
+        shadowSamplerInfo.compareEnable = VK_TRUE;
+        vkCreateSampler(CONTEXT->device, &shadowSamplerInfo, nullptr, &shadowSampler);
 
         CONTEXT->applicationDeletionQueue.PushDeletor(
-            [sampler]()
+            [sampler, shadowSampler]()
             {
                 vkDestroySampler(CONTEXT->device, sampler, nullptr);
+                vkDestroySampler(CONTEXT->device, shadowSampler, nullptr);
             }
         );
     }
@@ -502,17 +513,19 @@ void VulkanSetup::createPipelines()
     }
 
 
-    // ---------- SHADING PASS ----------
+    // ---------- LIGHTING PASS ----------
     {
         DescriptorSetLayoutBuilder deferredSetLayoutBuilder{};
         deferredSetLayoutBuilder
             .PushDeletionQueue(CONTEXT->applicationDeletionQueue)
             .AddBinding(0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // ubo
             .AddBinding(1, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // lights
-            .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler) // Cubemap
-            .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler) // Diffuse irradiance
-            .AddBinding(4, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // depth
-        uint32_t index = 5;
+            .AddBinding(2, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT) // shadow lights
+            .AddBinding(3, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &shadowSampler) // light shadow maps
+            .AddBinding(4, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler) // Cubemap
+            .AddBinding(5, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler) // Diffuse irradiance
+            .AddBinding(6, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // depth
+        uint32_t index = 7;
 
         for (gBuffer* g : CONTEXT->gBuffers)
             deferredSetLayoutBuilder.AddBinding(index++, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler); // gBuffer
@@ -562,7 +575,7 @@ void VulkanSetup::createCommandPool() {
 }
 
 void VulkanSetup::createDepthResources() {
-    VkFormat depthFormat = findDepthFormat();
+    VkFormat depthFormat = PipelineBuilder::findDepthFormat();
     //ImageHelpers::createImage(CONTEXT->swapChainExtent.width, CONTEXT->swapChainExtent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, CONTEXT->depthImage.image, CONTEXT->depthImage.memory);
     //CONTEXT->depthImage.view = ImageHelpers::createImageView(CONTEXT->depthImage.image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
@@ -596,10 +609,10 @@ void VulkanSetup::createDepthResources() {
 }
 
 void VulkanSetup::createUniformBuffers() {
+
+    // Uniform buffer
     std::vector<VkDeviceMemory> uniformBuffersMemory{};
-
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
     CONTEXT->uniformBuffers.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMemory.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
     CONTEXT->uniformBuffersMapped.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
@@ -640,6 +653,29 @@ void VulkanSetup::createUniformBuffers() {
             for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
                 vkDestroyBuffer(CONTEXT->device, CONTEXT->lightBuffers[i], nullptr);
                 vkFreeMemory(CONTEXT->device, lightsBuffersMemory[i], nullptr);
+            }
+        }
+    );
+
+    // Shadow lights
+    std::vector<VkDeviceMemory> shadowLightsBuffersMemory{};
+    bufferSize = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
+    CONTEXT->shadowLightBuffers.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    shadowLightsBuffersMemory.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+    CONTEXT->shadowLightBuffersMapped.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
+        BufferHelpers::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, CONTEXT->shadowLightBuffers[i], shadowLightsBuffersMemory[i]);
+
+        vkMapMemory(CONTEXT->device, shadowLightsBuffersMemory[i], 0, bufferSize, 0, &CONTEXT->shadowLightBuffersMapped[i]);
+    }
+
+    CONTEXT->applicationDeletionQueue.PushDeletor(
+        [shadowLightsBuffersMemory]()
+        {
+            for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
+                vkDestroyBuffer(CONTEXT->device, CONTEXT->shadowLightBuffers[i], nullptr);
+                vkFreeMemory(CONTEXT->device, shadowLightsBuffersMemory[i], nullptr);
             }
         }
     );
@@ -942,28 +978,4 @@ VkExtent2D VulkanSetup::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabil
 
         return actualExtent;
     }
-}
-
-VkFormat VulkanSetup::findDepthFormat() {
-    return findSupportedFormat(
-        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-    );
-}
-
-VkFormat VulkanSetup::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
-    for (VkFormat format : candidates) {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(CONTEXT->physicalDevice, format, &props);
-
-        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-            return format;
-        }
-        else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-            return format;
-        }
-    }
-
-    throw std::runtime_error("failed to find supported format!");
 }

@@ -286,19 +286,29 @@ private:
         diffuseIrradianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         diffuseIrradianceImageInfo.imageView = scene->cubemap.diffuseIrradianceImage.getView();
 
+        VkDescriptorImageInfo shadowMapsImageInfo{};
+        shadowMapsImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        shadowMapsImageInfo.imageView = DirectionalShadowLight::GetShadowMaps().getView();
+
         VkDescriptorBufferInfo lightBufferInfo{};
         lightBufferInfo.offset = 0;
         lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
+
+        VkDescriptorBufferInfo shadowLightBufferInfo{};
+        shadowLightBufferInfo.offset = 0;
+        shadowLightBufferInfo.range = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
 
         DescriptorSetBuilder lightingDescriptorSetBuilder{};
         lightingDescriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
-            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
-            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
-            .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, shadowLightBufferInfo, CONTEXT->shadowLightBuffers)
+            .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &shadowMapsImageInfo)
+            .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
+            .AddWrite(5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
+            .AddWrite(6, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 5;
+        uint32_t index = 7;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {
@@ -464,8 +474,26 @@ private:
         ubo.invProj = glm::inverse(ubo.proj);
         ubo.invView = glm::inverse(ubo.view);
 
-        memcpy(CONTEXT->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-        memcpy(CONTEXT->lightBuffersMapped[currentImage], scene->lights.data(), sizeof(Light) * std::min(CONTEXT->MAX_LIGHTS, static_cast<uint32_t>(scene->lights.size())));
+        memcpy(
+            CONTEXT->uniformBuffersMapped[currentImage], 
+            &ubo, 
+            sizeof(ubo)
+        );
+        memcpy(
+            CONTEXT->lightBuffersMapped[currentImage], 
+            scene->lights.data(), 
+            sizeof(Light) * std::min(CONTEXT->MAX_LIGHTS, static_cast<uint32_t>(scene->lights.size()))
+        );
+
+        std::vector<DirectionalShadowLightBufferObject> shadowLightsToCopy{ scene->directionalShadowLights.size() };
+        for (uint32_t i = 0; i < scene->directionalShadowLights.size(); i++)
+            shadowLightsToCopy[i] = *scene->directionalShadowLights[i];
+
+        memcpy(
+            CONTEXT->shadowLightBuffersMapped[currentImage], 
+            shadowLightsToCopy.data(),
+            sizeof(DirectionalShadowLightBufferObject) * std::min(CONTEXT->MAX_SHADOW_LIGHTS, static_cast<uint32_t>(shadowLightsToCopy.size()))
+        );
     }
 
 };

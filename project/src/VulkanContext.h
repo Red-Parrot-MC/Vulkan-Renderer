@@ -56,6 +56,8 @@ public:
     std::vector<void*> uniformBuffersMapped{};
     std::vector<VkBuffer> lightBuffers{};
     std::vector<void*> lightBuffersMapped{};
+    std::vector<VkBuffer> shadowLightBuffers{};
+    std::vector<void*> shadowLightBuffersMapped{};
 
     VkDescriptorPool descriptorPool{};
 
@@ -68,6 +70,8 @@ public:
     std::vector<gBuffer*> gBuffers{};
 
     const uint32_t MAX_LIGHTS{ 100 };
+    const uint32_t MAX_SHADOW_LIGHTS{ 10 };
+    const glm::ivec2 SHADOW_MAP_RESOLUTION{ 4096 / 1, 4096 / 1 };
 };
 
 class CurrentVulkanContext

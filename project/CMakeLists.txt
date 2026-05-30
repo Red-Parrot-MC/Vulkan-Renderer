@@ -26,7 +26,7 @@ add_executable(${PROJECT_NAME}
     "src/PipelineBuilder.h"
     "src/PipelineBuilder.cpp"
     "src/Image.h"
-    "src/Image.cpp" "src/DescriptorSetLayoutBuilder.h" "src/DescriptorSetLayoutBuilder.cpp" "src/CreateInfoHelpers.h" "src/Cubamap.h" "src/Cubemap.cpp")
+    "src/Image.cpp" "src/DescriptorSetLayoutBuilder.h" "src/DescriptorSetLayoutBuilder.cpp" "src/CreateInfoHelpers.h" "src/Cubamap.h" "src/Cubemap.cpp" "src/DirectionalShadowLight.h"  "src/DirectionalShadowLight.cpp")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

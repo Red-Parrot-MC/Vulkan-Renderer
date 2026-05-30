@@ -27,8 +27,12 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 	
 	- [ ] specular irradiance?
 - [ ] Shadow Mapping
+	- [x] calculate light view
+	- [x] generate depth map
+	- [ ] shadows
 - [ ] Refactoring
 	- [x] descriptor set layout builder
 	- [x] use single sampler
 	- [x] Name changes
 	- [ ] movable models
+	- [ ] redo descriptor set builder
