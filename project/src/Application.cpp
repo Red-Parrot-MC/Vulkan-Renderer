@@ -1,6 +1,10 @@
 #include "Application.h"
 #include "DirectionalShadowLight.h"
 
+//#define PARTY
+//#define SPONZA
+//#define ROTATE_LIGHT
+
 float randomFloat(float min, float max)
 {
 	return rand() / float(RAND_MAX) * (max - min) + min;
@@ -60,17 +64,25 @@ glm::vec3 hsv2rgb(glm::vec3 in)
 
 void Application::Initialize()
 {
-	//scene->LoadGLTF("resources/sponza/Sponza.gltf");
-	//scene->LoadGLTF("resources/Cactus/Cactus.gltf");
+#ifdef SPONZA
+    scene->LoadGLTF("resources/sponza/Sponza.gltf");
+    scene->CalculateBounds();
+
+    AddShadowLight(-80, 45, 100, { 1, 1, 1 });
+#else
     scene->LoadGLTF("resources/ABeautifulGame/ABeautifulGame.gltf");
     scene->modelMatrix = glm::translate(scene->modelMatrix, { 0, -0.4f, 0 });
     scene->modelMatrix = glm::scale(scene->modelMatrix, { 20, 20, 20 });
     scene->CalculateBounds();
-    camera.nearPlane = 0.01f;
+
+    AddShadowLight(-45, -90, 20, { 1, 1, 1 });
+#endif // SPONZA
+
+	//scene->LoadGLTF("resources/Cactus/Cactus.gltf");\
 
     float pitch = -45;
     float yaw = -90;
-    float size = 5.f;
+    float size = 3.f;
     float stepSize = .5f;
 
     float s = (size - 1) * stepSize / 2;
@@ -84,12 +96,12 @@ void Application::Initialize()
 
     std::cout << "Shadow lights: " << shadowLights.size() << "\n";
 
-    //AddShadowLight(pitch, yaw, 20, { 1, 1, 1 });
-
-	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
-	//{
- //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
-	//}
+#ifdef PARTY
+    for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
+    {
+        scene->lights.push_back(Light({ randomFloat(-8, 8), 0.f, randomFloat(-5, 5) }, 150, hsv2rgb({ randomFloat(0, 360), 1, 1 }), LightType::Point));
+    }
+#endif // PARTY
 
 	rotationData.resize(scene->lights.size(), glm::vec3(0));
 
@@ -102,14 +114,17 @@ void Application::Update(float deltaTime)
 {
 	UpdateCamera(deltaTime);
 
-    //glm::mat4 rotMatrix{ 1 };
-    //rotMatrix = glm::rotate(rotMatrix, deltaTime, glm::vec3(0, 1, 0));
+#ifdef ROTATE_LIGHT
+    glm::mat4 rotMatrix{ 1 };
+    rotMatrix = glm::rotate(rotMatrix, deltaTime, glm::vec3(0, 1, 0));
 
-    //for (auto light : shadowLights)
-    //{
-    //    light->GetBufferObject()->direction = rotMatrix * glm::vec4(light->GetBufferObject()->direction, 0);
-    //    light->UpdateDepthMap(*scene);
-    //}
+    for (auto light : shadowLights)
+    {
+        light->GetBufferObject()->direction = rotMatrix * glm::vec4(light->GetBufferObject()->direction, 0);
+        light->UpdateDepthMap(*scene);
+    }
+#endif // ROTATE_LIGHT
+
 
 	// x = rotation
 	// y = rotationVelocity

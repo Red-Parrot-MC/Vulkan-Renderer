@@ -70,8 +70,8 @@ public:
     std::vector<gBuffer*> gBuffers{};
 
     const uint32_t MAX_LIGHTS{ 100 };
-    const uint32_t MAX_SHADOW_LIGHTS{ 25 };
-    const glm::ivec2 SHADOW_MAP_RESOLUTION{ 4096 / 2, 4096 / 2 };
+    const uint32_t MAX_SHADOW_LIGHTS{ 10 };
+    const glm::ivec2 SHADOW_MAP_RESOLUTION{ 4096, 4096 };
 };
 
 class CurrentVulkanContext
