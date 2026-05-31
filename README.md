@@ -29,7 +29,7 @@ https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-Teun-DeMoor
 - [ ] Shadow Mapping
 	- [x] calculate light view
 	- [x] generate depth map
-	- [ ] shadows
+	- [x] shadows
 - [ ] Refactoring
 	- [x] descriptor set layout builder
 	- [x] use single sampler

@@ -432,7 +432,7 @@ void VulkanSetup::createPipelines()
         vkCreateSampler(CONTEXT->device, &samplerInfo, nullptr, &sampler);
         
         auto shadowSamplerInfo = CreateInfoHelpers::GetSamplerCreateInfo(VK_FILTER_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);
-        shadowSamplerInfo.compareOp = VK_COMPARE_OP_LESS;
+        shadowSamplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
         shadowSamplerInfo.compareEnable = VK_TRUE;
         vkCreateSampler(CONTEXT->device, &shadowSamplerInfo, nullptr, &shadowSampler);
 

@@ -172,7 +172,7 @@ void main()
         vec4 LightSpacePosition = light.proj * light.view * vec4(worldPosition, 1.f);
         LightSpacePosition /= LightSpacePosition.w;
         vec3 shadowMapUV = vec3(LightSpacePosition.xy * 0.5f + 0.5f,
-        LightSpacePosition.z);
+        LightSpacePosition.z - 0.01);
 
         // Manual compare - point sampling or nearest filtering required!
         float shadowTerm = texture(shadowMapsSampler, vec4(shadowMapUV.xy, light.layerIndex, shadowMapUV.z)).r;
@@ -196,7 +196,7 @@ void main()
         vec3 specular     = numerator / denominator;  
             
         // add to outgoing radiance Lo              
-        Lo = (kD * albedo.rgb / PI + specular) * irradiance * NdotL * shadowTerm;
+        Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL * shadowTerm;
     }
 
     // Calculate diffuse and specular terms based on roughness

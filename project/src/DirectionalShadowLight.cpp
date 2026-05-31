@@ -28,7 +28,6 @@ DirectionalShadowLight::DirectionalShadowLight(Light directionalLight, const Sce
 	bufferObject.intensity = directionalLight.intensity;
 	bufferObject.color = directionalLight.color;
 	bufferObject.shadowLayer = lightCount++;
-	CalculateLightBounds(scene.getBounds(), bufferObject.direction, bufferObject.view, bufferObject.proj);
 
 	VkImageSubresourceRange subResourceRange{};
 	subResourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -54,6 +53,7 @@ DirectionalShadowLight::DirectionalShadowLight(Light directionalLight, const Sce
 void DirectionalShadowLight::UpdateDepthMap(const Scene& scene)
 {
 	if (!pipeline.pipeline) InitializePipeline();
+	CalculateLightBounds(scene.getBounds(), bufferObject.direction, bufferObject.view, bufferObject.proj);
 
 	DirectionalShadowLightUniformBuffer uniformBuffer{};
 	uniformBuffer.proj = bufferObject.proj;

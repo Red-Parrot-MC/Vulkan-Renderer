@@ -66,22 +66,23 @@ void Application::Initialize()
     scene->CalculateBounds();
     camera.nearPlane = 0.01f;
 
-    float pitch = -45;
+    float pitch = -20;
     float yaw = -90;
-    float size = 5;
+    float size = 5.f;
     float stepSize = 1.f;
 
-    //float s = size / 2;
-    //for (float p = pitch - s; p < pitch + s; p += stepSize)
-    //{
-    //    for (float y = yaw - s; y < yaw + s; y += stepSize)
-    //    {
-    //        AddShadowLight(p, y, 0.4f, { 0.5, 0.5, 1 });
-    //    }
-    //}
+    float s = (size - 1) * stepSize / 2;
+    for (float p = pitch - s; p <= pitch + s; p += stepSize)
+    {
+        for (float y = yaw - s; y <= yaw + s; y += stepSize)
+        {
+            AddShadowLight(p, y, 20 / (size * size), {0.5, 0.5, 1});
+        }
+    }
 
+    std::cout << "Shadow lights: " << shadowLights.size() << "\n";
 
-    AddShadowLight(pitch, yaw, 5, { 1, 1, 1 });
+    //AddShadowLight(pitch, yaw, 20, { 1, 1, 1 });
 
 	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
 	//{
@@ -99,8 +100,14 @@ void Application::Update(float deltaTime)
 {
 	UpdateCamera(deltaTime);
 
-    //for (auto light : shadowLights)
-    //    light->UpdateDepthMap(*scene);
+    glm::mat4 rotMatrix{ 1 };
+    rotMatrix = glm::rotate(rotMatrix, deltaTime, glm::vec3(0, 1, 0));
+
+    for (auto light : shadowLights)
+    {
+        light->GetBufferObject()->direction = rotMatrix * glm::vec4(light->GetBufferObject()->direction, 0);
+        light->UpdateDepthMap(*scene);
+    }
 
 	// x = rotation
 	// y = rotationVelocity
