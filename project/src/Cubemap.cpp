@@ -221,8 +221,8 @@ void Cubemap::ConvertSphericalToCubemap(Image inputImage, VkDescriptorSetLayout 
     captureProj[1][1] *= -1.0f; // Inverted Y-axis for mathing face orientation
 
     VkViewport viewport{};
-    viewport.width = cubemapSize;
-    viewport.height = cubemapSize;
+    viewport.width = static_cast<float>(cubemapSize);
+    viewport.height = static_cast<float>(cubemapSize);
     viewport.minDepth = 0;
     viewport.maxDepth = 1;
 
@@ -352,8 +352,8 @@ void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShad
     captureProj[1][1] *= -1.0f; // Inverted Y-axis for mathing face orientation
 
     VkViewport viewport{};
-    viewport.width = outputCubemapImage.getExtent().width;
-    viewport.height = outputCubemapImage.getExtent().height;
+    viewport.width = static_cast<float>(outputCubemapImage.getExtent().width);
+    viewport.height = static_cast<float>(outputCubemapImage.getExtent().height);
     viewport.minDepth = 0;
     viewport.maxDepth = 1;
 

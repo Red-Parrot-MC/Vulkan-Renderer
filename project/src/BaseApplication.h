@@ -229,8 +229,8 @@ private:
         glfwGetWindowSize(CONTEXT->window, &width, &height);
 
         VkViewport viewport{};
-        viewport.width = width;
-        viewport.height = height;
+        viewport.width = static_cast<float>(width);
+        viewport.height = static_cast<float>(height);
         viewport.minDepth = 0;
         viewport.maxDepth = 1;
 
@@ -251,7 +251,7 @@ private:
         geometryRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         geometryRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
         geometryRenderInfo.layerCount = 1;
-        geometryRenderInfo.colorAttachmentCount = geometryColorAttachments.size();
+        geometryRenderInfo.colorAttachmentCount = static_cast<uint32_t>(geometryColorAttachments.size());
         geometryRenderInfo.pColorAttachments = geometryColorAttachments.data();
         geometryRenderInfo.pDepthAttachment = &geometryPassDepthAttachment;
         geometryRenderInfo.pStencilAttachment = nullptr;
@@ -260,7 +260,7 @@ private:
         lightingRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         lightingRenderInfo.renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, VkExtent2D{ uint32_t(width), uint32_t(height) } };
         lightingRenderInfo.layerCount = 1;
-        lightingRenderInfo.colorAttachmentCount = lightingColorAttachments.size();
+        lightingRenderInfo.colorAttachmentCount = static_cast<uint32_t>(lightingColorAttachments.size());
         lightingRenderInfo.pColorAttachments = lightingColorAttachments.data();
         lightingRenderInfo.pDepthAttachment = nullptr;
         lightingRenderInfo.pStencilAttachment = nullptr;
@@ -444,13 +444,13 @@ private:
     {
         for (VkSubmitInfo2& submitInfo : CONTEXT->drawFrameSubmitInfos)
         {
-            for (int i = 0; i < submitInfo.waitSemaphoreInfoCount; i++)
+            for (uint32_t i = 0; i < submitInfo.waitSemaphoreInfoCount; i++)
                 delete &submitInfo.pWaitSemaphoreInfos[i];
 
-            for (int i = 0; i < submitInfo.signalSemaphoreInfoCount; i++)
+            for (uint32_t i = 0; i < submitInfo.signalSemaphoreInfoCount; i++)
                 delete& submitInfo.pSignalSemaphoreInfos[i];
 
-            for (int i = 0; i < submitInfo.commandBufferInfoCount; i++)
+            for (uint32_t i = 0; i < submitInfo.commandBufferInfoCount; i++)
                 delete& submitInfo.pCommandBufferInfos[i];
         }
     }

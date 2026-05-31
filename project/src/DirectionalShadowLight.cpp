@@ -62,8 +62,8 @@ void DirectionalShadowLight::UpdateDepthMap(const Scene& scene)
 	memcpy(bufferMapped, &uniformBuffer, sizeof(uniformBuffer));
 
 	VkViewport viewport{};
-	viewport.width = shadowMaps.getExtent().width;
-	viewport.height = shadowMaps.getExtent().height;
+	viewport.width = static_cast<float>(shadowMaps.getExtent().width);
+	viewport.height = static_cast<float>(shadowMaps.getExtent().height);
 	viewport.minDepth = 0;
 	viewport.maxDepth = 1;
 

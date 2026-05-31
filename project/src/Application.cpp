@@ -24,35 +24,35 @@ glm::vec3 hsv2rgb(glm::vec3 in)
     switch (i) {
     case 0:
         out.r = in.b;
-        out.g = t;
-        out.b = p;
+        out.g = static_cast<float>(t);
+        out.b = static_cast<float>(p);
         break;
     case 1:
-        out.r = q;
+        out.r = static_cast<float>(q);
         out.g = in.b;
-        out.b = p;
+        out.b = static_cast<float>(p);
         break;
     case 2:
-        out.r = p;
+        out.r = static_cast<float>(p);
         out.g = in.b;
-        out.b = t;
+        out.b = static_cast<float>(t);
         break;
 
     case 3:
-        out.r = p;
-        out.g = q;
+        out.r = static_cast<float>(p);
+        out.g = static_cast<float>(q);
         out.b = in.b;
         break;
     case 4:
-        out.r = t;
-        out.g = p;
+        out.r = static_cast<float>(t);
+        out.g = static_cast<float>(p);
         out.b = in.b;
         break;
     case 5:
     default:
         out.r = in.b;
-        out.g = p;
-        out.b = q;
+        out.g = static_cast<float>(p);
+        out.b = static_cast<float>(q);
         break;
     }
     return out;
@@ -100,14 +100,14 @@ void Application::Update(float deltaTime)
 {
 	UpdateCamera(deltaTime);
 
-    glm::mat4 rotMatrix{ 1 };
-    rotMatrix = glm::rotate(rotMatrix, deltaTime, glm::vec3(0, 1, 0));
+    //glm::mat4 rotMatrix{ 1 };
+    //rotMatrix = glm::rotate(rotMatrix, deltaTime, glm::vec3(0, 1, 0));
 
-    for (auto light : shadowLights)
-    {
-        light->GetBufferObject()->direction = rotMatrix * glm::vec4(light->GetBufferObject()->direction, 0);
-        light->UpdateDepthMap(*scene);
-    }
+    //for (auto light : shadowLights)
+    //{
+    //    light->GetBufferObject()->direction = rotMatrix * glm::vec4(light->GetBufferObject()->direction, 0);
+    //    light->UpdateDepthMap(*scene);
+    //}
 
 	// x = rotation
 	// y = rotationVelocity

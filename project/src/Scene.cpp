@@ -138,20 +138,80 @@ bool Scene::LoadGLTF(std::string filename)
     model->textures.push_back(model->materials[0]->metalic_roughness);
     std::unordered_map<uint32_t, uint32_t> loadedMaterials{};
 
+    std::vector<uint32_t> nodesToLoad{};
+    std::vector<glm::mat4> nodeMatrices{};
+    const tg3_scene& tg3Scene = tg3Model->scenes[tg3Model->default_scene];
+
+    // add nodes from default scene
+    for (uint32_t i = 0; i < tg3Scene.nodes_count; i++)
+    {
+        uint32_t nodeIndex = tg3Scene.nodes[i];
+        const tg3_node& tg3Node = tg3Model->nodes[nodeIndex];
+
+        glm::vec3 scale = { tg3Node.scale[0], tg3Node.scale[1], tg3Node.scale[2] };
+        glm::vec3 translation = { tg3Node.translation[0], tg3Node.translation[1], tg3Node.translation[2] };
+        glm::vec3 rotation = { tg3Node.rotation[0], tg3Node.rotation[1], tg3Node.rotation[2] };
+        glm::mat4 modelMatrix = glm::mat4(1.0f);
+
+        // Translation
+        modelMatrix = glm::translate(modelMatrix, translation);
+        // Rotation
+        modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0, 0, 1));
+        modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0, 1, 0));
+        modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1, 0, 0));
+        // Scale
+        modelMatrix = glm::scale(modelMatrix, scale);
+
+        nodesToLoad.push_back(nodeIndex);
+        nodeMatrices.push_back(modelMatrix);
+    }
+
+    // add children
+    for (uint32_t i = 0; i < nodesToLoad.size(); i++)
+    {
+        uint32_t nodeIndex = nodesToLoad[i];
+        tg3_node tg3Node = tg3Model->nodes[nodeIndex];
+
+        for (uint32_t j = 0; j < tg3Node.children_count; j++)
+        {
+            uint32_t childNodeIndex = tg3Node.children[j];
+            const tg3_node& childNode = tg3Model->nodes[childNodeIndex];
+
+            glm::vec3 scale = { childNode.scale[0], childNode.scale[1], childNode.scale[2] };
+            glm::vec3 translation = { childNode.translation[0], childNode.translation[1], childNode.translation[2] };
+            glm::vec3 rotation = { childNode.rotation[0], childNode.rotation[1], childNode.rotation[2] };
+            glm::mat4 modelMatrix = glm::mat4(1.0f);
+
+            // Translation
+            modelMatrix = glm::translate(modelMatrix, translation);
+            // Rotation
+            modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0, 0, 1));
+            modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0, 1, 0));
+            modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1, 0, 0));
+            // Scale
+            modelMatrix = glm::scale(modelMatrix, scale);
+            
+            nodesToLoad.push_back(childNodeIndex);
+            nodeMatrices.push_back(nodeMatrices[i] * modelMatrix);
+        }
+    }
+
     uint32_t primitivesCount{ 0 };
     uint32_t primitivesLoaded{ 0 };
 
     // calculate model size
-    for (uint32_t nodeIndex = 0; nodeIndex < tg3Model->nodes_count; nodeIndex++)
+    for (uint32_t i = 0; i < nodesToLoad.size(); i++)
     {
+        uint32_t nodeIndex = nodesToLoad[i];
         const tg3_node& node = tg3Model->nodes[nodeIndex];
         int32_t meshIndex = node.mesh;
         tg3_mesh mesh = tg3Model->meshes[meshIndex];
         primitivesCount += mesh.primitives_count;
     }
 
-    for (uint32_t nodeIndex = 0; nodeIndex < tg3Model->nodes_count; nodeIndex++)
+    for (uint32_t i = 0; i < nodesToLoad.size(); i++)
     {
+        uint32_t nodeIndex = nodesToLoad[i];
         const tg3_node& node = tg3Model->nodes[nodeIndex];
         int32_t meshIndex = node.mesh;
         int32_t lightIndex = node.light;
@@ -165,35 +225,20 @@ bool Scene::LoadGLTF(std::string filename)
                 primitivesLoaded++;
                 std::cout << "\r\033[K" << float(primitivesLoaded) / primitivesCount * 100 << "%";
 
-                LoadPrimitiveGLTF(tg3Model, mesh.primitives[primitiveIndex], node, model, loadedMaterials, baseUri);
+                LoadPrimitiveGLTF(tg3Model, mesh.primitives[primitiveIndex], node, nodeMatrices[i], model, loadedMaterials, baseUri);
             }
         }
 
         if (lightIndex > -1)
         {
             const tg3_light& tg3Light = tg3Model->lights[lightIndex];
-            
-            glm::vec3 scale = { node.scale[0], node.scale[1], node.scale[2] };
-            glm::vec3 translation = { node.translation[0], node.translation[1], node.translation[2] };
-            glm::vec3 rotation = { node.rotation[0], node.rotation[1], node.rotation[2] };
 
-            glm::mat4 modelMatrix = glm::mat4(1.0f);
-
-            // Translation
-            modelMatrix = glm::translate(modelMatrix, translation);
-
-            // Rotation
-            modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1, 0, 0));
-            modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0, 1, 0));
-            modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0, 0, 1));
-
-            // Scale
-            modelMatrix = glm::scale(modelMatrix, scale);
+            const glm::mat4& modelMatrix = nodeMatrices[i];
 
             Light light{};
             light.pos = glm::vec4(0, 0, 0, 1) * modelMatrix;
             light.color = { tg3Light.color[0], tg3Light.color[1], tg3Light.color[2] };
-            light.intensity = tg3Light.intensity;
+            light.intensity = static_cast<float>(tg3Light.intensity);
             std::string type = tg3Light.type.data;
             if (type == "point")
             {
@@ -229,7 +274,7 @@ void Scene::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageInd
     }
 }
 
-void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg3Primitive, const tg3_node& node, Model* model, std::unordered_map<uint32_t, uint32_t>& loadedMaterials, std::string baseUri)
+void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg3Primitive, const tg3_node& node, const glm::mat4& modelMatrix, Model* model, std::unordered_map<uint32_t, uint32_t>& loadedMaterials, std::string baseUri)
 {
     tg3_accessor accessor = tg3Model->accessors[tg3Primitive.indices];
     tg3_buffer_view view = tg3Model->buffer_views[accessor.buffer_view];
@@ -389,22 +434,6 @@ void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg
     }
 
     primitive->vertices.reserve(positions.size());
-    glm::vec3 scale = { node.scale[0], node.scale[1], node.scale[2] };
-    glm::vec3 translation = { node.translation[0], node.translation[1], node.translation[2] };
-    glm::vec3 rotation = { node.rotation[0], node.rotation[1], node.rotation[2] };
-
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
-
-    // Translation
-    modelMatrix = glm::translate(modelMatrix, translation);
-
-    // Rotation
-    modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1, 0, 0));
-    modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0, 1, 0));
-    modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0, 0, 1));
-
-    // Scale
-    modelMatrix = glm::scale(modelMatrix, scale);
 
     for (size_t i = 0; i < positions.size(); i++)
     {
@@ -453,7 +482,7 @@ void Scene::LoadPrimitiveGLTF(const tg3_model* tg3Model, const tg3_primitive& tg
         else metallicRoughness = model->materials[0]->metalic_roughness;
 
         model->materials.push_back(new Material{ albedo, normal, metallicRoughness });
-        materialIndex = model->materials.size();
+        materialIndex = static_cast<uint32_t>(model->materials.size());
 
         loadedMaterials[tg3Primitive.material] = materialIndex;
     }
