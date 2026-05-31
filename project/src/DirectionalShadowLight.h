@@ -48,9 +48,9 @@ public:
 	DirectionalShadowLightBufferObject* GetBufferObject() { return &bufferObject; }
 	static Image GetShadowMaps() { return shadowMaps; }
 
+	static void InitializePipeline();
 private:
 
 	static void CalculateLightBounds(BoundingBox boundingBox, glm::vec3 lightDirection, glm::mat4& outView, glm::mat4& outProj);
 
-	static void InitializePipeline();
 };

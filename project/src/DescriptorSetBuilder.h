@@ -20,7 +20,7 @@ public:
         }
     }
 
-    DescriptorSetBuilder& AddWrite(uint32_t dstBinding, uint32_t dstArrayElement, VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorBufferInfo bufferInfo)
+    DescriptorSetBuilder& AddWrite(uint32_t dstBinding, uint32_t dstArrayElement, VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorBufferInfo* bufferInfo)
     {
         VkWriteDescriptorSet writeDescriptorSet{};
 
@@ -30,7 +30,7 @@ public:
         writeDescriptorSet.dstArrayElement = dstArrayElement;
         writeDescriptorSet.descriptorType = descriptorType;
         writeDescriptorSet.descriptorCount = descriptorCount;
-        writeDescriptorSet.pBufferInfo = &bufferInfo;
+        writeDescriptorSet.pBufferInfo = bufferInfo;
 
         for (size_t i = 0; i < descriptorWrites.size(); i++)
         {
@@ -40,7 +40,7 @@ public:
         return *this;
     }
 
-	DescriptorSetBuilder& AddWrite(uint32_t dstBinding, uint32_t dstArrayElement, VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorBufferInfo bufferInfo, const std::vector<VkBuffer>& buffers)
+	DescriptorSetBuilder& AddWrite(uint32_t dstBinding, uint32_t dstArrayElement, VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorBufferInfo& bufferInfo, const std::vector<VkBuffer>& buffers)
 	{
         VkWriteDescriptorSet writeDescriptorSet{};
 
@@ -103,6 +103,21 @@ public:
             for (size_t writeSet = 0; writeSet < descriptorWrites[i].size(); writeSet++)
             {
                 descriptorWrites[i][writeSet].dstSet = descriptorSets[i];
+
+                printf("binding = %llu\n",
+                    (unsigned long long)descriptorWrites[i][writeSet].dstBinding);
+
+                if (descriptorWrites[i][writeSet].pBufferInfo)
+                {
+                    printf("buffer = %p\n",
+                        (void*)descriptorWrites[i][writeSet].pBufferInfo->buffer);
+
+                    printf("offset = %llu\n",
+                        (unsigned long long)descriptorWrites[i][writeSet].pBufferInfo->offset);
+
+                    printf("range = %llu\n",
+                        (unsigned long long)descriptorWrites[i][writeSet].pBufferInfo->range);
+                }
             }
 
             vkUpdateDescriptorSets(CONTEXT->device, static_cast<uint32_t>(descriptorWrites[i].size()), descriptorWrites[i].data(), 0, nullptr);

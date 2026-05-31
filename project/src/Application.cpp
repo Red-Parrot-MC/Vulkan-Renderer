@@ -63,20 +63,22 @@ void Application::Initialize()
 	//scene->LoadGLTF("resources/sponza/Sponza.gltf");
 	//scene->LoadGLTF("resources/Cactus/Cactus.gltf");
     scene->LoadGLTF("resources/ABeautifulGame/ABeautifulGame.gltf");
+    scene->modelMatrix = glm::translate(scene->modelMatrix, { 0, -0.4f, 0 });
+    scene->modelMatrix = glm::scale(scene->modelMatrix, { 20, 20, 20 });
     scene->CalculateBounds();
     camera.nearPlane = 0.01f;
 
-    float pitch = -20;
+    float pitch = -45;
     float yaw = -90;
     float size = 5.f;
-    float stepSize = 1.f;
+    float stepSize = .5f;
 
     float s = (size - 1) * stepSize / 2;
     for (float p = pitch - s; p <= pitch + s; p += stepSize)
     {
         for (float y = yaw - s; y <= yaw + s; y += stepSize)
         {
-            AddShadowLight(p, y, 20 / (size * size), {0.5, 0.5, 1});
+            //AddShadowLight(p, y, 20 / (size * size), {0.5, 0.5, 1});
         }
     }
 
@@ -84,10 +86,10 @@ void Application::Initialize()
 
     //AddShadowLight(pitch, yaw, 20, { 1, 1, 1 });
 
-	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
-	//{
- //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.2f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
-	//}
+	for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
+	{
+        scene->lights.push_back(Light({ randomFloat(-8, 8), 0.f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
+	}
 
 	rotationData.resize(scene->lights.size(), glm::vec3(0));
 
@@ -125,15 +127,15 @@ void Application::Update(float deltaTime)
 		}
 	}
 
-    brightHue += deltaTime * 60;
-    if (brightHue > 360) brightHue -= 360;
+    //brightHue += deltaTime * 60;
+    //if (brightHue > 360) brightHue -= 360;
 
-    for (int i = 0; i < rotationData.size(); i++)
-    {
-        glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
-        float brightness = length(mult) * 10;
-        scene->lights[i].intensity = brightness;
-    }
+    //for (int i = 0; i < rotationData.size(); i++)
+    //{
+    //    glm::vec3 mult = hsv2rgb({ brightHue, 1, 1 }) * scene->lights[i].color;
+    //    float brightness = length(mult) * 10;
+    //    scene->lights[i].intensity = brightness;
+    //}
 }
 
 void Application::Cleanup()
@@ -148,7 +150,7 @@ void Application::Cleanup()
 
 void Application::UpdateCamera(float deltaTime)
 {
-	camera.ApplyDefaultMovement(deltaTime, 0.5f);
+	camera.ApplyDefaultMovement(deltaTime, 2.f);
 }
 
 void Application::AddShadowLight(float pitch, float yaw, float intensity, glm::vec3 color)

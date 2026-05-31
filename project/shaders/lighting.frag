@@ -61,7 +61,7 @@ layout(binding = 1) uniform LightBufferObject {
     Light lights[lightCount];
 } lightBuffer;
 
-const int shadowLightCount = 100;
+const int shadowLightCount = 25;
 layout(binding = 2) uniform ShadowLightBufferObject {
     ShadowLight shadowLights[shadowLightCount];
 } shadowLightBuffer;
@@ -95,6 +95,7 @@ void main()
     if (sampledDepth >= 1) 
     {
         outColor = vec4(texture(cubeSampler, -V).rgb, 1);
+        outColor /= outColor + vec4(1, 1, 1, 0);
         return;
     }
     
@@ -107,6 +108,8 @@ void main()
     F0 = mix(F0, albedo.rgb, metallic.g);
 
     vec3 Lo = vec3(0.0);
+
+    // --------- LIGHTS ---------
     for (int i = 0; i < lightCount; i++)
     {
         if (lightBuffer.lights[i].type == 0) break;
@@ -158,7 +161,8 @@ void main()
         // add to outgoing radiance Lo              
         Lo += (kD * albedo.rgb / PI + specular) * irradiance * NdotL;
     }
-
+    
+    // --------- SHADOWED LIGHTS ---------
     for (int i = 0; i < shadowLightCount; i++)
     {
         if (shadowLightBuffer.shadowLights[i].direction == vec3(0)) break;
@@ -212,6 +216,9 @@ void main()
     // Finalize color
     vec3 ambient = kD * diffuse * exposureCompensation;
     vec3 finalColor = ambient + Lo;
+
+    // Reinhard Tone Mapping
+    finalColor /= finalColor + vec3(1);
 
     outColor = vec4(finalColor, 1);
 }

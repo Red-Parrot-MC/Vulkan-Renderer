@@ -56,6 +56,7 @@ void DirectionalShadowLight::UpdateDepthMap(const Scene& scene)
 	CalculateLightBounds(scene.getBounds(), bufferObject.direction, bufferObject.view, bufferObject.proj);
 
 	DirectionalShadowLightUniformBuffer uniformBuffer{};
+	uniformBuffer.model = scene.modelMatrix;
 	uniformBuffer.proj = bufferObject.proj;
 	uniformBuffer.view = bufferObject.view;
 
@@ -278,6 +279,6 @@ void DirectionalShadowLight::InitializePipeline()
 
 	DescriptorSetBuilder setBuilder{ 1 };
 	descriptorSet = setBuilder
-		.AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
+		.AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &bufferInfo)
 		.Build(descriptorSetLayout)[0];
 }

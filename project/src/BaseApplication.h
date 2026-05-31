@@ -60,6 +60,7 @@ private:
 	{
         VulkanSetup::InitializeVulkan();
         scene = new Scene{};
+        DirectionalShadowLight::InitializePipeline();
 	}
 
 	void mainLoop()
@@ -272,7 +273,7 @@ private:
 
         DescriptorSetBuilder descriptorSetBuilder{ 1 };
         VkDescriptorSet depthDescriptorSet = descriptorSetBuilder
-            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &bufferInfo)
             .Build(CONTEXT->descriptorSetLayout)[0];
 
         VkDescriptorBufferInfo lightBufferInfo{};
@@ -284,6 +285,15 @@ private:
         shadowLightBufferInfo.offset = 0;
         shadowLightBufferInfo.range = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
         shadowLightBufferInfo.buffer = CONTEXT->shadowLightBuffers[imageIndex];
+
+        printf("shadowLightBuffer = %p\n",
+            (void*)shadowLightBufferInfo.buffer);
+
+        printf("offset = %llu\n",
+            (unsigned long long)shadowLightBufferInfo.offset);
+
+        printf("range = %llu\n",
+            (unsigned long long)shadowLightBufferInfo.range);
 
         VkDescriptorImageInfo depthImageInfo{};
         depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -303,9 +313,9 @@ private:
 
         DescriptorSetBuilder lightingDescriptorSetBuilder{ 1 };
         lightingDescriptorSetBuilder
-            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
-            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo)
-            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, shadowLightBufferInfo)
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &bufferInfo)
+            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &lightBufferInfo)
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &shadowLightBufferInfo)
             .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &shadowMapsImageInfo)
             .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
             .AddWrite(5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
@@ -468,7 +478,7 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::mat4(1.0f);
+        ubo.model = scene->modelMatrix;
         ubo.view = glm::lookAt(camera.origin, camera.origin + camera.forward, camera.up);
         ubo.proj = glm::perspective(glm::radians(camera.fov), CONTEXT->swapChainExtent.width / (float)CONTEXT->swapChainExtent.height, camera.nearPlane, camera.farPlane);
         ubo.proj[1][1] *= -1;

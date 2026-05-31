@@ -22,6 +22,7 @@ public:
 	std::vector<Light> lights{};
 	std::vector<DirectionalShadowLightBufferObject*> directionalShadowLights{};
 	Cubemap cubemap{};
+	glm::mat4 modelMatrix{ 1 };
 
 	void CalculateBounds();
 	BoundingBox getBounds() const { return boundingBox; }

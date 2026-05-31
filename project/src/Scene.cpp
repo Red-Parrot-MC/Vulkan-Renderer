@@ -509,8 +509,8 @@ void Scene::CalculateBounds()
         if (model->boundingBox.min == model->boundingBox.max)
             model->CalculateBounds();
 
-        glm::vec3 min = glm::vec4{ model->boundingBox.min, 1 }/* * model->modelMatrix*/;
-        glm::vec3 max = glm::vec4{ model->boundingBox.max, 1 }/* * model->modelMatrix*/;
+        glm::vec3 min = modelMatrix * glm::vec4{ model->boundingBox.min, 1 };
+        glm::vec3 max = modelMatrix * glm::vec4{ model->boundingBox.max, 1 };
         boundingBox.min = glm::min(boundingBox.min, min);
         boundingBox.min = glm::min(boundingBox.min, max);
         boundingBox.max = glm::max(boundingBox.max, min);
