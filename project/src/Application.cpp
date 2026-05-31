@@ -86,10 +86,10 @@ void Application::Initialize()
 
     //AddShadowLight(pitch, yaw, 20, { 1, 1, 1 });
 
-	for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
-	{
-        scene->lights.push_back(Light({ randomFloat(-8, 8), 0.f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
-	}
+	//for (int i = scene->lights.size(); i < CONTEXT->MAX_LIGHTS; i++)
+	//{
+ //       scene->lights.push_back(Light({ randomFloat(-8, 8), 0.f, randomFloat(-5, 5) }, 150, hsv2rgb({randomFloat(0, 360), 1, 1}), LightType::Point));
+	//}
 
 	rotationData.resize(scene->lights.size(), glm::vec3(0));
 

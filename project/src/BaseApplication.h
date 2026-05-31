@@ -298,6 +298,14 @@ private:
         diffuseIrradianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         diffuseIrradianceImageInfo.imageView = scene->cubemap.diffuseIrradianceImage.getView();
 
+        VkDescriptorImageInfo specularIrradianceImageInfo{};
+        specularIrradianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        specularIrradianceImageInfo.imageView = scene->cubemap.specularIrradianceImage.getView();
+
+        VkDescriptorImageInfo integrationMapImageInfo{};
+        integrationMapImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        integrationMapImageInfo.imageView = scene->cubemap.integrationMap.getView();
+
         VkDescriptorImageInfo shadowMapsImageInfo{};
         shadowMapsImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         shadowMapsImageInfo.imageView = DirectionalShadowLight::GetShadowMaps().getView();
@@ -310,9 +318,11 @@ private:
             .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &shadowMapsImageInfo)
             .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
             .AddWrite(5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
-            .AddWrite(6, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
+            .AddWrite(6, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &specularIrradianceImageInfo)
+            .AddWrite(7, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &integrationMapImageInfo)
+            .AddWrite(8, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthImageInfo);
 
-        uint32_t index = 7;
+        uint32_t index = 9;
         std::vector<VkDescriptorImageInfo*> imageInfos{};
         for (gBuffer* b : CONTEXT->gBuffers)
         {

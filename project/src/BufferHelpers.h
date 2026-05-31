@@ -1,5 +1,7 @@
 #pragma once
 #include "VulkanContext.h"
+#include <iostream>
+#include <vulkan/vk_enum_string_helper.h>
 
 class BufferHelpers
 {
@@ -24,7 +26,12 @@ public:
     }
 
     static void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-        vkEndCommandBuffer(commandBuffer);
+        VkResult result = vkEndCommandBuffer(commandBuffer);
+        if (result != VK_SUCCESS)
+        {
+            std::cout << string_VkResult(result) << "\n";
+            throw std::runtime_error("Failed to end command buffer");
+        }
 
         VkCommandBufferSubmitInfo commandBufferInfo{};
         commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
@@ -35,7 +42,12 @@ public:
         submitInfo.pCommandBufferInfos = &commandBufferInfo;
         submitInfo.commandBufferInfoCount = 1;
 
-        vkQueueSubmit2(CONTEXT->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        result = vkQueueSubmit2(CONTEXT->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS)
+        {
+            std::cout << string_VkResult(result) << "\n";
+            throw std::runtime_error("Failed to submit command buffer");
+        }
         vkQueueWaitIdle(CONTEXT->graphicsQueue);
 
         vkFreeCommandBuffers(CONTEXT->device, CONTEXT->commandPool, 1, &commandBuffer);

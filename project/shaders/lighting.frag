@@ -44,6 +44,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
 vec3 fresnelSchlick(float cosTheta, vec3 F0);
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness);
 vec3 SampleIBL_Diffuse(in vec3 normalWS, in float environmentIntensity);
+vec3 SampleIBL_Specular(in vec3 normalWS, in vec3 viewVectorWS, in vec3 fresnel, in float roughness, in float environmentIntensity);
 
 // ------------ BINDINGS -----------------
 layout(binding = 0) uniform UniformBufferObject {
@@ -72,11 +73,13 @@ layout(binding = 2) uniform ShadowLightBufferObject {
 layout(binding = 3) uniform sampler2DArrayShadow shadowMapsSampler;
 layout(binding = 4) uniform samplerCube cubeSampler;
 layout(binding = 5) uniform samplerCube diffuseIrradianceSampler;
-layout(binding = 6) uniform sampler2D depthSampler;
-layout(binding = 7) uniform sampler2D colorSampler;
-layout(binding = 8) uniform sampler2D normalSampler;
-layout(binding = 9) uniform sampler2D metallicSampler;
-layout(binding = 10) uniform sampler2D geometricNormalSampler;
+layout(binding = 6) uniform samplerCube specularIrradianceSampler;
+layout(binding = 7) uniform sampler2D integrationMapSampler;
+layout(binding = 8) uniform sampler2D depthSampler;
+layout(binding = 9) uniform sampler2D colorSampler;
+layout(binding = 10) uniform sampler2D normalSampler;
+layout(binding = 11) uniform sampler2D metallicSampler;
+layout(binding = 12) uniform sampler2D geometricNormalSampler;
 
 layout(location = 0) out vec4 outColor;
 
@@ -212,10 +215,12 @@ void main()
 
     // Calculate ambient diffuse lighting
     const vec3 prefilteredDiffuseIrradiance = SampleIBL_Diffuse(N, ubo.environmentIntensity);
+    const vec3 prefilteredSpecularIrradiance = SampleIBL_Specular(N, V, F, sqrt(metallic.r * metallic.r), ubo.environmentIntensity);
     const vec3 diffuse = prefilteredDiffuseIrradiance * albedo.rgb;
+    const vec3 specular = prefilteredSpecularIrradiance;
 
     // Finalize color
-    vec3 ambient = kD * diffuse * ubo.environmentExposure;
+    vec3 ambient = (kD * diffuse + specular) * ubo.environmentExposure;
     vec3 finalColor = (ambient + Lo) * ubo.exposure;
 
     // Reinhard Tone Mapping
@@ -324,4 +329,20 @@ vec3 SampleIBL_Diffuse(in vec3 normalWS, in float environmentIntensity)
     normalWS).rgb;
     const vec3 exposedPrefilteredDiffuseIrradiance = prefilteredDiffuseIrradiance * environmentIntensity;
     return exposedPrefilteredDiffuseIrradiance;
+}
+
+vec3 SampleIBL_Specular(in vec3 normalWS, in vec3 viewVectorWS, in vec3 fresnel, in float roughness, in float environmentIntensity)
+{
+    const float maxReflectionLod = 4.f;
+    const float lod = clamp(roughness * maxReflectionLod, 0.0, maxReflectionLod);
+    const vec3 reflectVectorWS = reflect(-viewVectorWS, normalWS);
+
+    const vec3 prefilteredSpecularIrradiance = textureLod(specularIrradianceSampler,
+        reflectVectorWS, lod).rgb;
+    const vec3 exposedPrefilteredSpecularIrradiance = prefilteredSpecularIrradiance * environmentIntensity;
+    const vec2 brdfLUT = texture(integrationMapSampler,
+    vec2(max(dot(normalWS, viewVectorWS), 0.0), roughness)).rg;
+
+    const vec3 indirectSpecular = exposedPrefilteredSpecularIrradiance * (fresnel * brdfLUT.x + brdfLUT.y);
+    return indirectSpecular;
 }
