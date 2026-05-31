@@ -268,11 +268,22 @@ private:
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
+        bufferInfo.buffer = CONTEXT->uniformBuffers[imageIndex];
 
-        DescriptorSetBuilder descriptorSetBuilder{};
-        auto descriptorSets = descriptorSetBuilder
-            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-            .Build(CONTEXT->descriptorSetLayout);
+        DescriptorSetBuilder descriptorSetBuilder{ 1 };
+        VkDescriptorSet depthDescriptorSet = descriptorSetBuilder
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
+            .Build(CONTEXT->descriptorSetLayout)[0];
+
+        VkDescriptorBufferInfo lightBufferInfo{};
+        lightBufferInfo.offset = 0;
+        lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
+        lightBufferInfo.buffer = CONTEXT->lightBuffers[imageIndex];
+
+        VkDescriptorBufferInfo shadowLightBufferInfo{};
+        shadowLightBufferInfo.offset = 0;
+        shadowLightBufferInfo.range = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
+        shadowLightBufferInfo.buffer = CONTEXT->shadowLightBuffers[imageIndex];
 
         VkDescriptorImageInfo depthImageInfo{};
         depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -290,19 +301,11 @@ private:
         shadowMapsImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         shadowMapsImageInfo.imageView = DirectionalShadowLight::GetShadowMaps().getView();
 
-        VkDescriptorBufferInfo lightBufferInfo{};
-        lightBufferInfo.offset = 0;
-        lightBufferInfo.range = sizeof(Light) * CONTEXT->MAX_LIGHTS;
-
-        VkDescriptorBufferInfo shadowLightBufferInfo{};
-        shadowLightBufferInfo.offset = 0;
-        shadowLightBufferInfo.range = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
-
-        DescriptorSetBuilder lightingDescriptorSetBuilder{};
+        DescriptorSetBuilder lightingDescriptorSetBuilder{ 1 };
         lightingDescriptorSetBuilder
-            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
-            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo, CONTEXT->lightBuffers)
-            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, shadowLightBufferInfo, CONTEXT->shadowLightBuffers)
+            .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
+            .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightBufferInfo)
+            .AddWrite(2, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, shadowLightBufferInfo)
             .AddWrite(3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &shadowMapsImageInfo)
             .AddWrite(4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &cubemapImageInfo)
             .AddWrite(5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &diffuseIrradianceImageInfo)
@@ -322,7 +325,7 @@ private:
             index++;
         }
 
-        VkDescriptorSet lightingDescriptorSet = lightingDescriptorSetBuilder.Build(CONTEXT->lightingPassDescriptorSetLayout)[imageIndex];
+        VkDescriptorSet lightingDescriptorSet = lightingDescriptorSetBuilder.Build(CONTEXT->lightingPassDescriptorSetLayout)[0];
 
         for (auto i : imageInfos)
             delete i;
@@ -341,9 +344,10 @@ private:
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+        // ------- DEPTH -------
         vkCmdBeginRendering(commandBuffer, &depthRenderInfo);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPassPipeline.pipeline);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPassPipeline.layout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->depthPassPipeline.layout, 0, 1, &depthDescriptorSet, 0, nullptr);
 
         for (auto model : scene->models)
         {
@@ -361,6 +365,7 @@ private:
 
         vkCmdEndRendering(commandBuffer);
 
+        // ------- GEOMETRY -------
         vkCmdBeginRendering(commandBuffer, &geometryRenderInfo);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->geometryPassPipeline.pipeline);
 
@@ -384,6 +389,7 @@ private:
         }
         CONTEXT->depthImage.TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
+        // ------- LIGHTING -------
         vkCmdBeginRendering(commandBuffer, &lightingRenderInfo);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.layout, 0, 1, &lightingDescriptorSet, 0, nullptr);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CONTEXT->lightingPassPipeline.pipeline);

@@ -276,7 +276,7 @@ void DirectionalShadowLight::InitializePipeline()
 	bufferInfo.range = sizeof(DirectionalShadowLightUniformBuffer);
 	bufferInfo.buffer = buffer;
 
-	DescriptorSetBuilder setBuilder{};
+	DescriptorSetBuilder setBuilder{ 1 };
 	descriptorSet = setBuilder
 		.AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo)
 		.Build(descriptorSetLayout)[0];

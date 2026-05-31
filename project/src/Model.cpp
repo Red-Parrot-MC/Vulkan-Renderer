@@ -97,7 +97,7 @@ void Material::Initialize()
         metalicRoughnessInfo.imageView = metalic_roughness->image.getView();
         //metalicRoughnessInfo.sampler = metalic_roughness->textureSampler;
 
-        DescriptorSetBuilder descriptorSetBuilder{};
+        DescriptorSetBuilder descriptorSetBuilder{ CONTEXT->MAX_FRAMES_IN_FLIGHT };
         descriptorSets = descriptorSetBuilder
             .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, bufferInfo, CONTEXT->uniformBuffers)
             .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &colorInfo)

@@ -7,9 +7,9 @@
 class DescriptorSetBuilder
 {
 public:
-	DescriptorSetBuilder()
+	DescriptorSetBuilder(uint32_t amount)
 	{
-        descriptorWrites.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+        descriptorWrites.resize(amount);
 	}
 
     ~DescriptorSetBuilder()
@@ -32,7 +32,7 @@ public:
         writeDescriptorSet.descriptorCount = descriptorCount;
         writeDescriptorSet.pBufferInfo = &bufferInfo;
 
-        for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++)
+        for (size_t i = 0; i < descriptorWrites.size(); i++)
         {
             descriptorWrites[i].push_back(writeDescriptorSet);
         }
@@ -51,7 +51,7 @@ public:
         writeDescriptorSet.descriptorType = descriptorType;
         writeDescriptorSet.descriptorCount = descriptorCount;
 
-        for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++)
+        for (size_t i = 0; i < descriptorWrites.size(); i++)
         {
             VkDescriptorBufferInfo* pBufferInfo = new VkDescriptorBufferInfo(bufferInfo);
             tempBuffers.push_back(pBufferInfo);
@@ -76,7 +76,7 @@ public:
         writeDescriptorSet.descriptorCount = descriptorCount;
         writeDescriptorSet.pImageInfo = pImageInfo;
 
-        for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++)
+        for (size_t i = 0; i < descriptorWrites.size(); i++)
         {
             descriptorWrites[i].push_back(writeDescriptorSet);
         }
@@ -86,20 +86,20 @@ public:
 
 	std::vector<VkDescriptorSet> Build(VkDescriptorSetLayout descriptorSetLayout)
 	{
-        std::vector<VkDescriptorSetLayout> layouts(CONTEXT->MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+        std::vector<VkDescriptorSetLayout> layouts(descriptorWrites.size(), descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = CONTEXT->descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorWrites.size());
         allocInfo.pSetLayouts = layouts.data();
 
         std::vector<VkDescriptorSet> descriptorSets{};
-        descriptorSets.resize(CONTEXT->MAX_FRAMES_IN_FLIGHT);
+        descriptorSets.resize(descriptorWrites.size());
         if (vkAllocateDescriptorSets(CONTEXT->device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
-        for (size_t i = 0; i < CONTEXT->MAX_FRAMES_IN_FLIGHT; i++) {
+        for (size_t i = 0; i < descriptorWrites.size(); i++) {
             for (size_t writeSet = 0; writeSet < descriptorWrites[i].size(); writeSet++)
             {
                 descriptorWrites[i][writeSet].dstSet = descriptorSets[i];

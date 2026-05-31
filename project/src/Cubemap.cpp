@@ -264,7 +264,7 @@ void Cubemap::ConvertSphericalToCubemap(Image inputImage, VkDescriptorSetLayout 
     VkDescriptorImageInfo samplerInfo{};
     samplerInfo.sampler = sampler;
 
-    DescriptorSetBuilder builder{};
+    DescriptorSetBuilder builder{ 1 };
     VkDescriptorSet descriptorSet = builder
         .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, &imageInfo)
         .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, &samplerInfo)
@@ -386,7 +386,7 @@ void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShad
     VkDescriptorImageInfo samplerInfo{};
     samplerInfo.sampler = inputSampler;
 
-    DescriptorSetBuilder builder{};
+    DescriptorSetBuilder builder{ 1 };
     VkDescriptorSet descriptorSet = builder
         .AddWrite(0, 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, &imageInfo)
         .AddWrite(1, 0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, &samplerInfo)
