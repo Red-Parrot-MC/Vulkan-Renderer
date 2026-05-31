@@ -286,15 +286,6 @@ private:
         shadowLightBufferInfo.range = sizeof(DirectionalShadowLightBufferObject) * CONTEXT->MAX_SHADOW_LIGHTS;
         shadowLightBufferInfo.buffer = CONTEXT->shadowLightBuffers[imageIndex];
 
-        printf("shadowLightBuffer = %p\n",
-            (void*)shadowLightBufferInfo.buffer);
-
-        printf("offset = %llu\n",
-            (unsigned long long)shadowLightBufferInfo.offset);
-
-        printf("range = %llu\n",
-            (unsigned long long)shadowLightBufferInfo.range);
-
         VkDescriptorImageInfo depthImageInfo{};
         depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthImageInfo.imageView = CONTEXT->depthImage.getView();
@@ -489,6 +480,10 @@ private:
 
         ubo.invProj = glm::inverse(ubo.proj);
         ubo.invView = glm::inverse(ubo.view);
+
+        ubo.exposure = camera.getExposure();
+        ubo.environmentIntensity = 1;
+        ubo.environmentExposure = 1;
 
         memcpy(
             CONTEXT->uniformBuffersMapped[currentImage], 

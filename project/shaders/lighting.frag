@@ -54,6 +54,9 @@ layout(binding = 0) uniform UniformBufferObject {
     vec4 cameraPos;
     mat4 invView;
     mat4 invProj;
+    float exposure;
+    float environmentIntensity;
+    float environmentExposure;
 } ubo;
 
 const int lightCount = 100;
@@ -78,8 +81,6 @@ layout(binding = 10) uniform sampler2D geometricNormalSampler;
 layout(location = 0) out vec4 outColor;
 
 // ------------ CONSTANTS -----------------
-const float environmentIntensity = 1;
-const float exposureCompensation = 1;
 
 // ------------ CODE -----------------
 void main()
@@ -210,12 +211,12 @@ void main()
     kD *= 1.f - metallic.g;
 
     // Calculate ambient diffuse lighting
-    const vec3 prefilteredDiffuseIrradiance = SampleIBL_Diffuse(N, environmentIntensity);
+    const vec3 prefilteredDiffuseIrradiance = SampleIBL_Diffuse(N, ubo.environmentIntensity);
     const vec3 diffuse = prefilteredDiffuseIrradiance * albedo.rgb;
 
     // Finalize color
-    vec3 ambient = kD * diffuse * exposureCompensation;
-    vec3 finalColor = ambient + Lo;
+    vec3 ambient = kD * diffuse * ubo.environmentExposure;
+    vec3 finalColor = (ambient + Lo) * ubo.exposure;
 
     // Reinhard Tone Mapping
     finalColor /= finalColor + vec3(1);

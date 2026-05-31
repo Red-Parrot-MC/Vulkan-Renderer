@@ -116,6 +116,9 @@ struct UniformBufferObject {
     glm::vec4 cameraPos;
     glm::mat4 invView;
     glm::mat4 invProj;
+    float exposure;
+    float environmentIntensity;
+    float environmentExposure;
 };
 
 struct gBuffer

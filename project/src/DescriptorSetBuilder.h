@@ -2,8 +2,6 @@
 #include "VulkanContext.h"
 #include <stdexcept>
 
-// this sucks
-
 class DescriptorSetBuilder
 {
 public:
@@ -103,21 +101,6 @@ public:
             for (size_t writeSet = 0; writeSet < descriptorWrites[i].size(); writeSet++)
             {
                 descriptorWrites[i][writeSet].dstSet = descriptorSets[i];
-
-                printf("binding = %llu\n",
-                    (unsigned long long)descriptorWrites[i][writeSet].dstBinding);
-
-                if (descriptorWrites[i][writeSet].pBufferInfo)
-                {
-                    printf("buffer = %p\n",
-                        (void*)descriptorWrites[i][writeSet].pBufferInfo->buffer);
-
-                    printf("offset = %llu\n",
-                        (unsigned long long)descriptorWrites[i][writeSet].pBufferInfo->offset);
-
-                    printf("range = %llu\n",
-                        (unsigned long long)descriptorWrites[i][writeSet].pBufferInfo->range);
-                }
             }
 
             vkUpdateDescriptorSets(CONTEXT->device, static_cast<uint32_t>(descriptorWrites[i].size()), descriptorWrites[i].data(), 0, nullptr);
