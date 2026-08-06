@@ -96,10 +96,11 @@ void DirectionalShadowLight::UpdateDepthMap(const Scene& scene)
 	renderingInfo.pDepthAttachment = &depthAttachment;
 	renderingInfo.pStencilAttachment = nullptr;
 
-	VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+	VkCommandBuffer cmd = CommandBufferHelpers::beginSingleTimeCommands();
 	{
 		vkCmdSetViewport(cmd, 0, 1, &viewport);
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
+		vkCmdSetCullMode(cmd, VK_CULL_MODE_NONE);
 
 		shadowMaps.TransitionLayout(cmd, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, subResourceRange);
 
@@ -125,7 +126,7 @@ void DirectionalShadowLight::UpdateDepthMap(const Scene& scene)
 
 		shadowMaps.TransitionLayout(cmd, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, subResourceRange);
 	}
-	BufferHelpers::endSingleTimeCommands(cmd);
+	CommandBufferHelpers::endSingleTimeCommands(cmd);
 }
 
 void DirectionalShadowLight::EditLight(Light light)
@@ -245,7 +246,7 @@ void DirectionalShadowLight::InitializePipeline()
 		.SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_TRUE, 1.25f, 0, 1.75f)
 		.SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
 		.SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-		.SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+		.SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE })
 		.AddSetLayout(descriptorSetLayout)
 		.SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
 		.SetDepthFormat(PipelineBuilder::findDepthFormat())

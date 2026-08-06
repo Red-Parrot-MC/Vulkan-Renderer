@@ -95,7 +95,7 @@ void Cubemap::Load(std::string filePath, uint32_t cubemapSize)
     CubemapPushConstants pushConstants{};
 
     // COMMAND BUFFER
-    VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+    VkCommandBuffer cmd = CommandBufferHelpers::beginSingleTimeCommands();
     {
         vkCmdBeginRendering(cmd, &renderInfo);
         {
@@ -108,7 +108,7 @@ void Cubemap::Load(std::string filePath, uint32_t cubemapSize)
         }
         vkCmdEndRendering(cmd);
     }
-    BufferHelpers::endSingleTimeCommands(cmd);
+    CommandBufferHelpers::endSingleTimeCommands(cmd);
     integrationMap.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     deletionQueue.Flush();
@@ -364,7 +364,7 @@ void Cubemap::ConvertSphericalToCubemap(Image inputImage, VkDescriptorSetLayout 
     cubemapImage.TransitionLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
 
     // COMMAND BUFFER
-    VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+    VkCommandBuffer cmd = CommandBufferHelpers::beginSingleTimeCommands();
     {
         vkCmdSetViewport(cmd, 0, 1, &viewport);
         vkCmdSetScissor(cmd, 0, 1, &scissor);
@@ -382,7 +382,7 @@ void Cubemap::ConvertSphericalToCubemap(Image inputImage, VkDescriptorSetLayout 
             vkCmdEndRendering(cmd);
         }
     }
-    BufferHelpers::endSingleTimeCommands(cmd);
+    CommandBufferHelpers::endSingleTimeCommands(cmd);
     vkDeviceWaitIdle(CONTEXT->device);
 }
 
@@ -500,7 +500,7 @@ void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShad
     outputCubemapImage.TransitionLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, subresourceRange);
 
     // COMMAND BUFFER
-    VkCommandBuffer cmd = BufferHelpers::beginSingleTimeCommands();
+    VkCommandBuffer cmd = CommandBufferHelpers::beginSingleTimeCommands();
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptorSet, 0, nullptr);
@@ -528,7 +528,7 @@ void Cubemap::RenderToCubeMap(std::string vertexShader, std::string fragmentShad
             }
         }
     }
-    BufferHelpers::endSingleTimeCommands(cmd);
+    CommandBufferHelpers::endSingleTimeCommands(cmd);
 
     deletionQueue.Flush();
 }

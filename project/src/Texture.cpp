@@ -76,7 +76,7 @@ void Texture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWi
         throw std::runtime_error("texture image format does not support linear blitting!");
     }
 
-    VkCommandBuffer commandBuffer = BufferHelpers::beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = CommandBufferHelpers::beginSingleTimeCommands();
 
     VkImageSubresourceRange subresourceRange{};
     subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -122,7 +122,7 @@ void Texture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWi
 
     ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
 
-    BufferHelpers::endSingleTimeCommands(commandBuffer);
+    CommandBufferHelpers::endSingleTimeCommands(commandBuffer);
 }
 
 void Texture::CreateDebugNameInfo(const char* name)

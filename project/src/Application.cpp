@@ -70,6 +70,7 @@ void Application::Initialize()
 
     AddShadowLight(-80, 45, 100, { 1, 1, 1 });
 #else
+    scene->LoadGLTF("resources/grass/grass.gltf");
     scene->LoadGLTF("resources/ABeautifulGame/ABeautifulGame.gltf");
     scene->modelMatrix = glm::translate(scene->modelMatrix, { 0, -0.4f, 0 });
     scene->modelMatrix = glm::scale(scene->modelMatrix, { 20, 20, 20 });
@@ -107,12 +108,13 @@ void Application::Initialize()
 
     std::cout << "\n\n\nCONTROLS: \n\tMoving: [WASDQE] \n\tLooking: [ARROWS / RMB]\n\n";
 
-    scene->cubemap.Load("resources/textures/circus_arena_4k.hdr");
+    scene->cubemap.Load("resources/textures/mossy_forest_4k.hdr");
 }
 
 void Application::Update(float deltaTime)
 {
 	UpdateCamera(deltaTime);
+    shadowLights[0]->UpdateDepthMap(*scene);
 
 #ifdef ROTATE_LIGHT
     glm::mat4 rotMatrix{ 1 };

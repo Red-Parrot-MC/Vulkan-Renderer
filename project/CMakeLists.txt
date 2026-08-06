@@ -26,7 +26,7 @@ add_executable(${PROJECT_NAME}
     "src/PipelineBuilder.h"
     "src/PipelineBuilder.cpp"
     "src/Image.h"
-    "src/Image.cpp" "src/DescriptorSetLayoutBuilder.h" "src/DescriptorSetLayoutBuilder.cpp" "src/CreateInfoHelpers.h" "src/Cubamap.h" "src/Cubemap.cpp" "src/DirectionalShadowLight.h"  "src/DirectionalShadowLight.cpp")
+    "src/Image.cpp" "src/DescriptorSetLayoutBuilder.h" "src/DescriptorSetLayoutBuilder.cpp" "src/CreateInfoHelpers.h" "src/Cubamap.h" "src/Cubemap.cpp" "src/DirectionalShadowLight.h"  "src/DirectionalShadowLight.cpp" "src/CommandBufferHelpers.h" "src/CommandBufferHelpers.cpp")
 
 # Copy resources to output folder (preserve folder structure)
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
@@ -176,11 +176,11 @@ FetchContent_MakeAvailable(stb)
 # Fetch tinygltf
 FetchContent_Declare(
     tinygltf
-    GIT_REPOSITORY https://github.com/syoyo/tinygltf
-    GIT_TAG release
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG v3.0.0
     GIT_PROGRESS TRUE
     GIT_SHALLOW TRUE
-)   #GIT_TAG v2.9.5
+)
 FetchContent_MakeAvailable(tinygltf)
 
 # Fetch tiny_obj_loader

@@ -186,12 +186,35 @@ void VulkanSetup::pickPhysicalDevice() {
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(CONTEXT->instance, &deviceCount, devices.data());
 
-    for (const auto& device : devices) {
-        if (isDeviceSuitable(device)) {
-            CONTEXT->physicalDevice = device;
-            break;
+    std::vector<VkPhysicalDevice> suitableDevices{};
+
+    VkDeviceSize maxSize = 0;
+
+    for (const auto& device : devices)
+    {
+        if (isDeviceSuitable(device))
+        {
+            VkPhysicalDeviceMemoryProperties memoryProperties{};
+            vkGetPhysicalDeviceMemoryProperties(device, &memoryProperties);
+
+            VkDeviceSize totalMemorySize = 0;
+
+            for (uint32_t i = 0; i < memoryProperties.memoryHeapCount; i++)
+            {
+                totalMemorySize += memoryProperties.memoryHeaps[i].size;
+            }
+
+            if (totalMemorySize > maxSize)
+            {
+                maxSize = totalMemorySize;
+                CONTEXT->physicalDevice = device;
+            }
         }
     }
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(CONTEXT->physicalDevice, &properties);
+    std::cout << "Selected GPU: " << properties.deviceName << "\n";
 
     if (CONTEXT->physicalDevice == VK_NULL_HANDLE) {
         throw std::runtime_error("failed to find a suitable GPU!");
@@ -468,7 +491,7 @@ void VulkanSetup::createPipelines()
             .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
             .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
             .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE })
             .AddSetLayout(CONTEXT->descriptorSetLayout)
             .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_FALSE, VK_FALSE)
             .SetDepthFormat(PipelineBuilder::findDepthFormat())
@@ -499,7 +522,7 @@ void VulkanSetup::createPipelines()
             .SetRasterizer(VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, 1.0f, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_FALSE)
             .SetMultisampling(VK_FALSE, VK_SAMPLE_COUNT_1_BIT)
             .SetColorBlending(VK_FALSE, VK_LOGIC_OP_COPY)
-            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR })
+            .SetDynamicStates({ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE })
             .AddSetLayout(CONTEXT->descriptorSetLayout)
             .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE)
             .SetDepthFormat(PipelineBuilder::findDepthFormat())

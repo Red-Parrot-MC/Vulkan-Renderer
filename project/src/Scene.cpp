@@ -115,7 +115,7 @@ bool Scene::LoadGLTF(std::string filename)
 
 	for (uint32_t i = 0; i < errorStack.count(); i++)
 	{
-		std::cerr << "GLTF: " << errorStack.entry(i)->message;
+		std::cerr << "GLTF: " << errorStack.entry(i)->message << "\n";
 	}
 
 	if (errorCode != tg3_error_code::TG3_OK)

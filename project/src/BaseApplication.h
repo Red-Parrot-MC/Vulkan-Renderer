@@ -354,6 +354,7 @@ private:
 
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdSetCullMode(commandBuffer, VK_CULL_MODE_NONE);
 
         // ------- DEPTH -------
         vkCmdBeginRendering(commandBuffer, &depthRenderInfo);

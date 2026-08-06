@@ -21,11 +21,11 @@ public:
 
     static void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange)
     {
-        VkCommandBuffer commandBuffer = BufferHelpers::beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = CommandBufferHelpers::beginSingleTimeCommands();
 
         transitionImageLayout(commandBuffer, image, oldLayout, newLayout, subresourceRange);
 
-        BufferHelpers::endSingleTimeCommands(commandBuffer);
+        CommandBufferHelpers::endSingleTimeCommands(commandBuffer);
     }
 
     static void transitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspectMask, uint32_t mipLevels = 1)
@@ -74,7 +74,7 @@ public:
     }
 
     static void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-        VkCommandBuffer commandBuffer = BufferHelpers::beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = CommandBufferHelpers::beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -102,7 +102,7 @@ public:
             &region
         );
 
-        BufferHelpers::endSingleTimeCommands(commandBuffer);
+        CommandBufferHelpers::endSingleTimeCommands(commandBuffer);
     }
 
     static void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
@@ -215,7 +215,7 @@ public:
 
         subresourceRange.levelCount = 1;
 
-        VkCommandBuffer commandBuffer = BufferHelpers::beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = CommandBufferHelpers::beginSingleTimeCommands();
 
         int32_t mipWidth = texWidth;
         int32_t mipHeight = texHeight;
@@ -255,6 +255,6 @@ public:
 
         ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
 
-        BufferHelpers::endSingleTimeCommands(commandBuffer);
+        CommandBufferHelpers::endSingleTimeCommands(commandBuffer);
     }
 };
