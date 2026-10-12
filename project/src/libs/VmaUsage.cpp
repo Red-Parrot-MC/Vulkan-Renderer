@@ -27,4 +27,4 @@ vk_mem_alloc.h to include definitions of its internal implementation
 
 #define VMA_IMPLEMENTATION
 
-#include "../VmaUsage.h"
+#include "VmaUsage.h"

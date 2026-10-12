@@ -3,7 +3,6 @@
 
 layout(push_constant) uniform PushConstants {
     mat4 projection;
-    mat4 view;
 	uint mipLevel;
 } pushConstants;
 
@@ -44,6 +43,6 @@ void main()
 {
 	vec3 position = g_vertexPositions[gl_VertexIndex];
 	fragLocalPosition = position;
-	gl_Position = pushConstants.projection * pushConstants.view
+	gl_Position = pushConstants.projection
 		* vec4(position.xyz, 1.f);
 }

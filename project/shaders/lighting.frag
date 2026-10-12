@@ -90,6 +90,11 @@ void main()
 {
 	const ivec2 pos = ivec2(gl_FragCoord.xy);
 	float sampledDepth = texelFetch(depthSampler, pos, 0).r;
+    vec4 albedo = texelFetch(colorSampler, pos, 0);
+    vec2 metallic = texelFetch(metallicSampler, pos, 0).rg;
+    vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
+
+
     const vec3 worldPosition = GetWorldPositionFromDepth(sampledDepth, 
         pos, ubo.resolution, 
         ubo.invProj, ubo.invView);
@@ -102,10 +107,6 @@ void main()
         outColor /= outColor + vec4(1, 1, 1, 0);
         return;
     }
-    
-    vec4 albedo = texelFetch(colorSampler, pos, 0);
-    vec2 metallic = texelFetch(metallicSampler, pos, 0).rg;
-    vec3 N = Decode(texelFetch(normalSampler, pos, 0).rg);
 
     
     vec3 F0 = vec3(0.04); 

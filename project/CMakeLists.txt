@@ -1,67 +1,31 @@
 # Create the executable
-add_executable(${PROJECT_NAME} 
-    "src/libs/vk_mem_alloc.h"
-    "src/libs/VmaUsage.cpp"
-    
-    "src/main.cpp"
-    "src/VulkanContext.h"
-    "src/BufferHelpers.h"
-    "src/ImageHelpers.h"
-    "src/Texture.cpp"
-    "src/VulkanContext.cpp"
-    "src/VulkanSetup.h"
-    "src/VulkanSetup.cpp"
-    "src/structs.h"
-    "src/BaseApplication.h" 
-    "src/Scene.h" 
-    "src/Scene.cpp"
-    "src/Model.h"
-    "src/Model.cpp"
-    "src/DescriptorSetBuilder.h" 
-    "src/Camera.h"
-    "src/Application.h" 
-    "src/Application.cpp"
-    "src/VmaUsage.h"
-    "src/DeletionQueue.h"
-    "src/PipelineBuilder.h"
-    "src/PipelineBuilder.cpp"
-    "src/Image.h"
-    "src/Image.cpp" "src/DescriptorSetLayoutBuilder.h" "src/DescriptorSetLayoutBuilder.cpp" "src/CreateInfoHelpers.h" "src/Cubamap.h" "src/Cubemap.cpp" "src/DirectionalShadowLight.h"  "src/DirectionalShadowLight.cpp" "src/CommandBufferHelpers.h" "src/CommandBufferHelpers.cpp")
-
-# Copy resources to output folder (preserve folder structure)
-set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
-file(GLOB_RECURSE RESOURCE_FILES
-    "${RESOURCES_SOURCE_DIR}/*.jpg"
-    "${RESOURCES_SOURCE_DIR}/*.png"
-    "${RESOURCES_SOURCE_DIR}/*.obj"
-    "${RESOURCES_SOURCE_DIR}/*.fx"
-    "${RESOURCES_SOURCE_DIR}/*.gltf"
-    "${RESOURCES_SOURCE_DIR}/*.bin"
-    "${RESOURCES_SOURCE_DIR}/*.hdr"
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    "src/*.cpp"
+    "src/*.h"
+    "src/*.hpp"
 )
+
+add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Copy resources to output folder
+set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 set(RESOURCES_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/resources/")
-file(MAKE_DIRECTORY ${RESOURCES_OUT_DIR})
-foreach(RESOURCE ${RESOURCE_FILES})
-    # Compute path relative to the resources source dir
-    file(RELATIVE_PATH REL_PATH "${RESOURCES_SOURCE_DIR}" "${RESOURCE}")
-    # Get directory component of the relative path
-    get_filename_component(REL_DIR "${REL_PATH}" DIRECTORY)
-    if(REL_DIR STREQUAL ".")
-        set(DEST_DIR "${RESOURCES_OUT_DIR}")
-    else()
-        set(DEST_DIR "${RESOURCES_OUT_DIR}/${REL_DIR}")
-    endif()
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEST_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy "${RESOURCE}" "${DEST_DIR}"
-    )
-endforeach()
+
+file(GLOB_RECURSE RESOURCE_FILES CONFIGURE_DEPENDS
+    "${RESOURCES_SOURCE_DIR}"
+)
+
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCES_OUT_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${RESOURCES_SOURCE_DIR}" "${RESOURCES_OUT_DIR}"
+)
 
 # Compile shaders
 set(SHADER_COMPILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 set(SHADER_COMPILE_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
 
-file(GLOB_RECURSE SHADER_SOURCE_FILES
+file(GLOB_RECURSE SHADER_SOURCE_FILES CONFIGURE_DEPENDS
     "${SHADER_COMPILE_DIR}/*.vert"
     "${SHADER_COMPILE_DIR}/*.frag"
     "${SHADER_COMPILE_DIR}/*.comp"
@@ -93,8 +57,7 @@ foreach(SHADER ${SHADER_SOURCE_FILES})
 
         COMMAND glslangValidator
             -V
-            -g
-            ${SHADER}
+            -g ${SHADER}
             -o ${OUTPUT_FILE}
 
         DEPENDS ${SHADER}
@@ -118,18 +81,17 @@ add_dependencies(${PROJECT_NAME} CompileShaders)
 
 # Copy shaders to output folder
 set(SHADERS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
-file(GLOB_RECURSE SHADER_FILES
+set(SHADERS_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders/")
+
+file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "${SHADERS_SOURCE_DIR}/*.spv"
 )
-set(SHADERS_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders/")
-file(MAKE_DIRECTORY ${SHADERS_OUT_DIR})
-foreach(SHADER ${SHADER_FILES})
-    add_custom_command(
-        TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${SHADER} ${SHADERS_OUT_DIR}
-        DEPENDS ${SHADER}
-    )
-endforeach(SHADER)
+
+add_custom_command(
+    TARGET CompileShaders POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_OUT_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${SHADERS_SOURCE_DIR}" "${SHADERS_OUT_DIR}"
+)
 
 # Vulkan setup
 find_package(Vulkan REQUIRED)

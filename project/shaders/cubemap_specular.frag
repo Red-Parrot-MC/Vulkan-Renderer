@@ -24,7 +24,6 @@ layout(set = 0, binding = 1) uniform sampler environmentMapSampler;
 
 layout(push_constant) uniform PushConstants {
     mat4 projection;
-    mat4 view;
 	uint mipLevel;
 } pushConstants;
 

@@ -41,6 +41,7 @@ void main() {
     }
 
     outNormal = Encode(normal);
+    //outNormal = normal.xy;
 
     // METALIC + ROUGHNESS
     outMetalic = texture(metalicRoughnessSampler, fragTexCoord).gb;

@@ -1,0 +1,138 @@
+#include "ImageHelpers.h"
+#include "Texture.h"
+
+#include <stb_image.h>
+#include <stdexcept>
+#include <algorithm>
+#include <cstring>
+
+#define GLM_FORCE_RADIANS
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+Texture::Texture(const char* filename, VkFormat format)
+{
+    CreateTextureImage(filename, format);
+
+    if (vkSetDebugUtilsObjectName)
+        CreateDebugNameInfo(filename);
+}
+
+Texture::~Texture()
+{
+    image.Destroy();
+}
+
+void Texture::CreateTextureImage(const char* filename, VkFormat format)
+{
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(filename, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    opaque = texChannels < 4; // if image has alpha -> not opaque
+    mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    BufferHelpers::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(CONTEXT->device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(CONTEXT->device, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    image.Create(
+        texWidth, texHeight, mipLevels, format, 
+        VK_IMAGE_TILING_OPTIMAL, 
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    ImageHelpers::copyBufferToImage(stagingBuffer, image.getImage(), static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+
+    vkDestroyBuffer(CONTEXT->device, stagingBuffer, nullptr);
+    vkFreeMemory(CONTEXT->device, stagingBufferMemory, nullptr);
+
+    GenerateMipmaps(mipLevels);
+}
+
+
+void Texture::GenerateMipmaps(uint32_t mipLevels) {
+    VkImageSubresourceRange subresourceRange{};
+    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresourceRange.baseArrayLayer = 0;
+    subresourceRange.layerCount = 1;
+    subresourceRange.levelCount = 1;
+
+    image.GenerateMipmaps(mipLevels, subresourceRange);
+
+    // Check if image format supports linear blitting
+    //VkFormatProperties formatProperties;
+    //vkGetPhysicalDeviceFormatProperties(CONTEXT->physicalDevice, imageFormat, &formatProperties);
+
+    //if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+    //    throw std::runtime_error("texture image format does not support linear blitting!");
+    //}
+
+    //VkCommandBuffer commandBuffer = CommandBufferHelpers::beginSingleTimeCommands();
+
+    //VkImageSubresourceRange subresourceRange{};
+    //subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //subresourceRange.baseArrayLayer = 0;
+    //subresourceRange.layerCount = 1;
+    //subresourceRange.levelCount = 1;
+
+    //int32_t mipWidth = texWidth;
+    //int32_t mipHeight = texHeight;
+
+    //for (uint32_t i = 1; i < mipLevels; i++) {
+    //    subresourceRange.baseMipLevel = i - 1;
+
+    //    ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+
+    //    VkImageBlit blit{};
+    //    blit.srcOffsets[0] = { 0, 0, 0 };
+    //    blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+    //    blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //    blit.srcSubresource.mipLevel = i - 1;
+    //    blit.srcSubresource.baseArrayLayer = 0;
+    //    blit.srcSubresource.layerCount = 1;
+    //    blit.dstOffsets[0] = { 0, 0, 0 };
+    //    blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+    //    blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //    blit.dstSubresource.mipLevel = i;
+    //    blit.dstSubresource.baseArrayLayer = 0;
+    //    blit.dstSubresource.layerCount = 1;
+
+    //    vkCmdBlitImage(commandBuffer,
+    //        image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    //        image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //        1, &blit,
+    //        VK_FILTER_LINEAR);\
+
+    //    ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+
+    //    if (mipWidth > 1) mipWidth /= 2;
+    //    if (mipHeight > 1) mipHeight /= 2;
+    //}
+
+    //subresourceRange.baseMipLevel = mipLevels - 1;
+
+    //ImageHelpers::transitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange);
+
+    //CommandBufferHelpers::endSingleTimeCommands(commandBuffer);
+}
+
+void Texture::CreateDebugNameInfo(const char* name)
+{
+    image.SetDebugNameInfo(name);
+}
